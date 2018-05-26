@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
+	"strconv"
 )
 
 type Server struct {
@@ -54,18 +56,30 @@ func handleGA(rw *bufio.ReadWriter) {
 }
 
 func readUint32Helper(rw *bufio.ReadWriter) (uint32, error) {
-	var number uint32
-	var i uint
+	// Peek at some data so we force it to wait for some data so we don't get
+	// zero buffer sizes all the time...
+	rw.Reader.Peek(2)
 
-	for i = 0; i < 4; i = i + 1 {
-		b, err := rw.ReadByte()
-		if err != nil {
-			return number, err
-		}
-		number += uint32(b) << (3 - i)
+	// See how much data is waiting for us.
+	bytesToRead := rw.Reader.Buffered()
+	// We want to read at most eight hex decimals
+	if bytesToRead > 8 {
+		bytesToRead = 8
+	}
+	// And at least two.
+	if bytesToRead < 2 {
+		bytesToRead = 2
 	}
 
-	return number, nil
+	bytes := make([]byte, bytesToRead)
+	_, err := io.ReadFull(rw, bytes)
+	if err != nil {
+		return 0, err
+	}
+
+	// Convert number from hex to a real one
+	n, err := strconv.ParseUint(string(bytes), 16, 32)
+	return uint32(n), err
 }
 
 func readTwoByteCommand(rw *bufio.ReadWriter) (string, error) {
@@ -92,22 +106,26 @@ func handleRequest(conn net.Conn) {
 	defer conn.Close()
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 	defer rw.Flush()
-	// Make a buffer to hold incoming data.
 
 	// First, read uint32 version number
 	version, err := readUint32Helper(rw)
-	log.Println("Got client version", version, err)
 	if err != nil {
-		rw.Write([]byte("Could not read version"))
+		log.Printf("Could not read client version: %s", err)
 		return
 	}
 
-	// Reply to command
-	// TODO: Protocol says to echo version if everything is ok
-	rw.Write([]byte{0, 0, 0, 0})
+	// Bail on unknown versions
+	if version != 0xfe {
+		log.Printf("Got invalid client version %d", version)
+		fmt.Fprintf(rw, "%08x", 0)
+		return
+	}
+
+	// Protocol says to echo version if everything is ok
+	log.Printf("Got client version %d", version)
+	fmt.Fprintf(rw, "%08x", version)
 
 	for {
-		log.Print("Receive command\n")
 		cmd, err := readTwoByteCommand(rw)
 		if err != nil {
 			log.Println("Error reading command. Got: "+cmd+"\n", err)
@@ -117,7 +135,6 @@ func handleRequest(conn net.Conn) {
 		log.Println("Got command", cmd)
 		switch cmd {
 		case "q":
-			rw.Write([]byte("BYE"))
 			log.Println("Quitting")
 			return
 		case "ga":
