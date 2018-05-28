@@ -17,6 +17,41 @@ type Server struct {
 type Conn struct {
 }
 
+type CacheMemory struct {
+	data map[string][]byte
+}
+
+func NewCacheMemory() *CacheMemory {
+	return &CacheMemory{data: make(map[string][]byte)}
+}
+
+func (c *CacheMemory) Has(kind byte, uuidAndHash []byte) (bool, error) {
+	key := fmt.Sprintf("%x%s", kind, uuidAndHash)
+	log.Println("CacheMemory.Has", key)
+
+	_, ok := c.data[key]
+	return ok, nil
+}
+
+func (c *CacheMemory) Put(kind byte, uuidAndHash []byte, data []byte) error {
+	key := fmt.Sprintf("%x%s", kind, uuidAndHash)
+	log.Println("CacheMemory.Put", key)
+
+	c.data[key] = data
+	return nil
+}
+
+func (c *CacheMemory) Get(kind byte, uuidAndHash []byte) ([]byte, error) {
+	key := fmt.Sprintf("%x%s", kind, uuidAndHash)
+	log.Println("CacheMemory.Get", key)
+
+	if data, ok := c.data[key]; ok {
+		return data, nil
+	}
+
+	return []byte{}, nil
+}
+
 const (
 	CONN_TYPE = "tcp"
 	CONN_PORT = ":8126"
@@ -107,6 +142,11 @@ func handleRequest(conn net.Conn) {
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 	defer rw.Flush()
 
+	cache := NewCacheMemory()
+	trx := make([]byte, 0)
+	var trxType byte
+	var trxData []byte
+
 	// First, read uint32 version number
 	version, err := readUint32Helper(rw)
 	if err != nil {
@@ -126,19 +166,126 @@ func handleRequest(conn net.Conn) {
 	fmt.Fprintf(rw, "%08x", version)
 
 	for {
-		cmd, err := readTwoByteCommand(rw)
+		//cmd, err := readTwoByteCommand(rw)
+		cmd, err := rw.ReadByte()
 		if err != nil {
-			log.Println("Error reading command. Got: "+cmd+"\n", err)
+			log.Println("Error reading command:", err)
 			return
 		}
 
-		log.Println("Got command", cmd)
-		switch cmd {
-		case "q":
+		log.Printf("Got command %c", cmd)
+
+		// Quit command
+		if cmd == 'q' {
 			log.Println("Quitting")
 			return
-		case "ga":
-			handleGA(rw)
+		}
+
+		// Get type
+		cmdType, err := rw.ReadByte()
+		if err != nil {
+			log.Println("Error reading command type:", err)
+			return
+		}
+
+		log.Printf("Got command type %c", cmdType)
+
+		// GET
+		if cmd == 'g' {
+			// Read uuidAndHash
+			uuidAndHash := make([]byte, 32+32)
+			_, err := io.ReadFull(rw, uuidAndHash)
+
+			ok, err := cache.Has(cmdType, uuidAndHash)
+			if err != nil {
+				log.Println("Error reading from cache:", err)
+				fmt.Fprintf(rw, "%c-%s", cmdType, uuidAndHash)
+				continue
+			}
+			if !ok {
+				log.Println("Cache miss")
+				fmt.Fprintf(rw, "%c-%s", cmdType, uuidAndHash)
+				continue
+			}
+
+			data, err := cache.Get(cmdType, uuidAndHash)
+			if err != nil {
+				log.Println("Error reading from cache:", err)
+				fmt.Fprintf(rw, "%c-%s", cmdType, uuidAndHash)
+				continue
+			}
+			fmt.Fprintf(rw, "%c+%08x%s", cmdType, len(data), uuidAndHash)
+			rw.Write(data)
+			continue
+		}
+
+		// Transaction start
+		if cmd == 't' && cmdType == 's' {
+			log.Printf("Transaction start")
+			// Bail if we're already in a command
+			if len(trx) > 0 {
+				log.Println("Error starting trx inside trx")
+				return
+			}
+
+			// Read uuidAndHash
+			uuidAndHash := make([]byte, 32+32)
+			_, err := io.ReadFull(rw, uuidAndHash)
+			if err != nil {
+				log.Println("Error reading uuid+hash:", err)
+				return
+			}
+
+			trx = uuidAndHash
+		}
+
+		// Transaction end
+		if cmd == 't' && cmdType == 'e' {
+			log.Printf("Transaction end")
+			if len(trx) == 0 {
+				log.Println("Error ending trx - none started")
+				return
+			}
+
+			err := cache.Put(trxType, trx, trxData)
+			if err != nil {
+				log.Println("Error ending trx - cache put error:", err)
+				continue
+			}
+
+			trx = []byte{}
+			trxType = 0
+			trxData = []byte{}
+		}
+
+		// Put
+		if cmd == 'p' {
+			log.Println("PUT")
+			// Read size
+			sizeBytes := make([]byte, 8)
+			_, err := io.ReadFull(rw, sizeBytes)
+			if err != nil {
+				log.Println("Error putting - cannot read size:", err)
+				return
+			}
+			log.Println("PUT / SIZE BYTES", string(sizeBytes))
+
+			// Parse size
+			size, err := strconv.ParseUint(string(sizeBytes), 16, 32)
+			if err != nil {
+				log.Printf("Error putting - cannot parse size '%x': %s", sizeBytes, err)
+				return
+			}
+			log.Println("PUT / SIZE", size)
+
+			trxData = make([]byte, size)
+			_, err = io.ReadFull(rw, trxData)
+			if err != nil {
+				log.Println("Error putting - cannot read data:", err)
+				return
+			}
+
+			trxType = cmdType
 		}
 	}
 }
