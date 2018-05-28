@@ -11,12 +11,6 @@ import (
 	"strconv"
 )
 
-type Server struct {
-}
-
-type Conn struct {
-}
-
 type CacheMemory struct {
 	data map[string][]byte
 }
@@ -80,15 +74,6 @@ func Listen(ctx context.Context) {
 }
 
 type Handler func(*bufio.ReadWriter)
-
-// Get Asset (ga) command.
-// client --- 'ga' (id <128bit GUID><128bit HASH>) --> server
-// client <-- '+a' (size <uint64>) (id <128bit GUID><128bit HASH>) + size bytes --- server (found in cache)
-// client <-- '-a' (id <128bit GUID><128bit HASH>) --- server (not found in cache)
-func handleGA(rw *bufio.ReadWriter) {
-	// Read 128 bit GUID
-	// READ 128 bit HASH
-}
 
 func readUint32Helper(rw *bufio.ReadWriter) (uint32, error) {
 	// Peek at some data so we force it to wait for some data so we don't get
