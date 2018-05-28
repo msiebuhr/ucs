@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/msiebuhr/unity-cache-server"
+	"gitlab.com/msiebuhr/ucs"
 )
 
 func main() {
