@@ -24,35 +24,55 @@ and closes the connection.
 
 ## Request cached item
 ```
+# Binary stuff
 client --- 'ga' (id <128bit GUID><128bit HASH>) --> server
 client <-- '+a' (size <uint64>) (id <128bit GUID><128bit HASH>) + size bytes --- server (found in cache)
 client <-- '-a' (id <128bit GUID><128bit HASH>) --- server (not found in cache)
 
+# Info files
 client --- 'gi' (id <128bit GUID><128bit HASH>) --> server
 client <-- '+i' (size <uint64>) (id <128bit GUID><128bit HASH>) + size bytes --- server (found in cache)
 client <-- '-i' (id <128bit GUID><128bit HASH>) --- server (not found in cache)
 
+# Resources
 client --- 'gr' (id <128bit GUID><128bit HASH>) --> server
 client <-- '+r' (size <uint64>) (id <128bit GUID><128bit HASH>) + size bytes --- server	(found in cache)
 client <-- '-r' (id <128bit GUID><128bit HASH>) --- server (not found in cache)
 ```
-## Start transaction
+## Putting items
+
+Multiple entries (asset, info and resources) exist for one item in the server,
+so they're always uploaded inside a transaction:
+
 ```
 client --- 'ts' (id <128bit GUID><128bit HASH>) --> server
 ```
 
-## Put cached item
+Then one or more put operations for different kinds of assets
+
 ```
 client --- 'pa' (size <uint64>) + size bytes --> server
 client --- 'pi' (size <uint64>) + size bytes --> server
 client --- 'pr' (size <uint64>) + size bytes --> server
 ```
 
-## End transaction (i.e. rename targets to their final names)
+And finally the whole thing is finished of (i.e. rename targets to their final names).
+
 ```
 client --- 'te' --> server
 ```
+
+An example transaction could be (newlines added for readability)
+
+    ts00000000000000ff00000000000000ee # Start transaction for GUID ff / hash ee
+    pi0000000000000008                 # Put eight bytes of info
+    INFOBLOB                           # Eight bytes of info
+    pa0000000000000008                 # Put eight bytes of data
+    DATABLOB                           # Eight bytes of data
+    te                                 # End transaction
+
 ## Quit
+
 ```
 client --- 'q' --> server
 ```
