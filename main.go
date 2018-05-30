@@ -9,7 +9,12 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"time"
 )
+
+func PrettyUuidAndHash(d []byte) string {
+	return fmt.Sprintf("%x/%x", d[:16], d[17:])
+}
 
 type CacheMemory struct {
 	data map[string][]byte
@@ -20,24 +25,24 @@ func NewCacheMemory() *CacheMemory {
 }
 
 func (c *CacheMemory) Has(kind byte, uuidAndHash []byte) (bool, error) {
+	log.Printf("CacheMemory.Has %c %s", kind, PrettyUuidAndHash(uuidAndHash))
 	key := fmt.Sprintf("%x%s", kind, uuidAndHash)
-	log.Println("CacheMemory.Has", key)
 
 	_, ok := c.data[key]
 	return ok, nil
 }
 
 func (c *CacheMemory) Put(kind byte, uuidAndHash []byte, data []byte) error {
+	log.Printf("CacheMemory.Put %c %s", kind, PrettyUuidAndHash(uuidAndHash))
 	key := fmt.Sprintf("%x%s", kind, uuidAndHash)
-	log.Println("CacheMemory.Put", key)
 
 	c.data[key] = data
 	return nil
 }
 
 func (c *CacheMemory) Get(kind byte, uuidAndHash []byte) ([]byte, error) {
+	log.Printf("CacheMemory.Get %c %s", kind, PrettyUuidAndHash(uuidAndHash))
 	key := fmt.Sprintf("%x%s", kind, uuidAndHash)
-	log.Println("CacheMemory.Get", key)
 
 	if data, ok := c.data[key]; ok {
 		return data, nil
@@ -127,6 +132,8 @@ func handleRequest(conn net.Conn) {
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 	defer rw.Flush()
 
+	conn.SetDeadline(time.Now().Add(2 * time.Second))
+
 	cache := NewCacheMemory()
 	trx := make([]byte, 0)
 	var trxType byte
@@ -151,6 +158,12 @@ func handleRequest(conn net.Conn) {
 	fmt.Fprintf(rw, "%08x", version)
 
 	for {
+		// Set fresh timeout
+		conn.SetDeadline(time.Now().Add(2 * time.Second))
+
+		// Explicitly send back data after each command
+		rw.Flush()
+
 		//cmd, err := readTwoByteCommand(rw)
 		cmd, err := rw.ReadByte()
 		if err != nil {
@@ -178,28 +191,30 @@ func handleRequest(conn net.Conn) {
 		// GET
 		if cmd == 'g' {
 			// Read uuidAndHash
-			uuidAndHash := make([]byte, 32+32)
+			uuidAndHash := make([]byte, 32)
 			_, err := io.ReadFull(rw, uuidAndHash)
+
+			log.Printf("Get / %c %s", cmdType, PrettyUuidAndHash(uuidAndHash))
 
 			ok, err := cache.Has(cmdType, uuidAndHash)
 			if err != nil {
 				log.Println("Error reading from cache:", err)
-				fmt.Fprintf(rw, "%c-%s", cmdType, uuidAndHash)
+				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
 				continue
 			}
 			if !ok {
 				log.Println("Cache miss")
-				fmt.Fprintf(rw, "%c-%s", cmdType, uuidAndHash)
+				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
 				continue
 			}
 
 			data, err := cache.Get(cmdType, uuidAndHash)
 			if err != nil {
 				log.Println("Error reading from cache:", err)
-				fmt.Fprintf(rw, "%c-%s", cmdType, uuidAndHash)
+				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
 				continue
 			}
-			fmt.Fprintf(rw, "%c+%08x%s", cmdType, len(data), uuidAndHash)
+			fmt.Fprintf(rw, "+%c%08x%s", cmdType, len(data), uuidAndHash)
 			rw.Write(data)
 			continue
 		}
@@ -214,7 +229,7 @@ func handleRequest(conn net.Conn) {
 			}
 
 			// Read uuidAndHash
-			uuidAndHash := make([]byte, 32+32)
+			uuidAndHash := make([]byte, 32)
 			_, err := io.ReadFull(rw, uuidAndHash)
 			if err != nil {
 				log.Println("Error reading uuid+hash:", err)
@@ -247,7 +262,7 @@ func handleRequest(conn net.Conn) {
 		if cmd == 'p' {
 			log.Println("PUT")
 			// Read size
-			sizeBytes := make([]byte, 8)
+			sizeBytes := make([]byte, 16)
 			_, err := io.ReadFull(rw, sizeBytes)
 			if err != nil {
 				log.Println("Error putting - cannot read size:", err)

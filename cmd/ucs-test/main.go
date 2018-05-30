@@ -1,14 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
-	"bytes"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
 	"strconv"
+
+	"gitlab.com/msiebuhr/ucs"
 )
 
 func main() {
@@ -36,7 +38,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not read returned data: %s", err)
 	}
-	log.Printf("Got response %s", responseAndData)
+	log.Printf("Got response %s %s", responseAndData[:2], ucs.PrettyUuidAndHash(responseAndData[3:]))
 
 	// Put something in the cache
 	rand.Read(randomGuidAndHash)
@@ -63,7 +65,7 @@ func main() {
 		}
 		size, err := strconv.ParseUint(string(sizeBytes), 16, 64)
 		if err != nil {
-			log.Printf("Could not parse int:", err)
+			log.Printf("Could not parse int: %s", err)
 		}
 		log.Printf("Got positive response size: %s/%d", sizeBytes, size)
 
@@ -73,23 +75,30 @@ func main() {
 		if err != nil {
 			log.Printf("Could not read response guid+hash: %s", err)
 		}
-		log.Printf("Got positive response guid/hash: %x", guidAndHash)
+		log.Printf("Got positive response guid/hash: %s", ucs.PrettyUuidAndHash(guidAndHash))
 
 		response := make([]byte, size)
 		_, err = io.ReadFull(conn, response)
 		if err != nil {
-			log.Printf("Could not read data:", err)
+			log.Printf("Could not read data: %s", err)
 		}
 		// Check response data matches what we uploaded
 		log.Printf("Returned data matches upload? %t!", bytes.Equal(data, response))
+	} else if dataType[0] == '-' {
+		// Read guid + hash
+		guidAndHash := make([]byte, 32)
+		_, err = io.ReadFull(conn, guidAndHash)
+		if err != nil {
+			log.Printf("Could not read response guid+hash: %s", err)
+		}
+		log.Printf("Got negative response guid/hash: %s", ucs.PrettyUuidAndHash(guidAndHash))
 	}
-	// TODO: else (dataType[0] == '-') { }
 
 	conn.Write([]byte("q"))
 	// Read all remaining data
 	rest, err := ioutil.ReadAll(conn)
 	if err != nil {
-		log.Fatalf("Could not read remaining data: %s", err)
+		log.Fatalf("Could not read remaining data: %x", err)
 	}
 	log.Printf("Got rest '%s'", rest)
 
