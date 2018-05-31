@@ -128,10 +128,14 @@ func readTwoByteCommand(rw *bufio.ReadWriter) (string, error) {
 
 // Handles incoming requests.
 func handleRequest(conn net.Conn) {
-	defer conn.Close()
+	defer func() {
+		log.Println("Closing connection")
+		conn.Close()
+	}()
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 	defer rw.Flush()
 
+	// Set deadline for getting data five seconds in the future
 	conn.SetDeadline(time.Now().Add(2 * time.Second))
 
 	cache := NewCacheMemory()
@@ -158,10 +162,14 @@ func handleRequest(conn net.Conn) {
 	fmt.Fprintf(rw, "%08x", version)
 
 	for {
-		// Set fresh timeout
+		// Extend Read-dealine by five seconds for each command we process
 		conn.SetDeadline(time.Now().Add(2 * time.Second))
 
-		// Explicitly send back data after each command
+		// Flush version or previous command
+		// The original server get really confused if clients do agressive
+		// streaming. Explicitly waiting for output from previous command
+		// seem to make it happy...
+		log.Printf("Flushing")
 		rw.Flush()
 
 		//cmd, err := readTwoByteCommand(rw)
@@ -236,7 +244,10 @@ func handleRequest(conn net.Conn) {
 				return
 			}
 
+			log.Printf("Transaction started for %s", PrettyUuidAndHash(uuidAndHash))
+
 			trx = uuidAndHash
+			continue
 		}
 
 		// Transaction end
@@ -256,6 +267,7 @@ func handleRequest(conn net.Conn) {
 			trx = []byte{}
 			trxType = 0
 			trxData = []byte{}
+			continue
 		}
 
 		// Put
@@ -271,7 +283,7 @@ func handleRequest(conn net.Conn) {
 			log.Println("PUT / SIZE BYTES", string(sizeBytes))
 
 			// Parse size
-			size, err := strconv.ParseUint(string(sizeBytes), 16, 32)
+			size, err := strconv.ParseUint(string(sizeBytes), 16, 64)
 			if err != nil {
 				log.Printf("Error putting - cannot parse size '%x': %s", sizeBytes, err)
 				return
@@ -286,6 +298,11 @@ func handleRequest(conn net.Conn) {
 			}
 
 			trxType = cmdType
+			continue
 		}
+
+		// Invalid command
+		log.Printf("Invalid command: %c%c", cmd, cmdType)
+		return
 	}
 }
