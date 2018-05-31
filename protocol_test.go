@@ -105,3 +105,32 @@ func TestGACachePutAndGet(t *testing.T) {
 		t.Errorf("Expected reply for request to be\n `%s`, got\n `%s`", expected, string(out))
 	}
 }
+
+func TestCacheMultiPutAndGet(t *testing.T) {
+	client, server := net.Pipe()
+	go handleRequest(server)
+
+	data := []byte("Here is some very lovely test information for ya'")
+
+	go func() {
+		fmt.Fprintf(client, "%08x", 0xfe)
+		fmt.Fprintf(client, "ts%016s%016s", "dead", "beef")
+		fmt.Fprintf(client, "pi%016x", len(data))
+		client.Write(data)
+		fmt.Fprintf(client, "pa%016x", len(data))
+		client.Write(data)
+		fmt.Fprintf(client, "te")
+		fmt.Fprintf(client, "gi%016s%016s", "dead", "beef")
+		fmt.Fprintf(client, "ga%016s%016s", "dead", "beef")
+		client.Write([]byte("q"))
+	}()
+
+	out, err := ioutil.ReadAll(client)
+	if err != nil {
+		t.Errorf("Error reading response: %s", err)
+	}
+	expected := fmt.Sprintf("%08x+i%08x%016s%016s%s+a%08x%016s%016s%s", 0xfe, len(data), "dead", "beef", data, len(data), "dead", "beef", data)
+	if !bytes.Equal(out, []byte(expected)) {
+		t.Errorf("Expected reply for request to be\n `%s`, got\n `%s`", expected, string(out))
+	}
+}

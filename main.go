@@ -3,6 +3,7 @@ package ucs
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -16,36 +17,91 @@ func PrettyUuidAndHash(d []byte) string {
 	return fmt.Sprintf("%x/%x", d[:16], d[17:])
 }
 
+const (
+	TYPE_ASSET    = 'a'
+	TYPE_INFO     = 'i'
+	TYPE_RESOURCE = 'r'
+)
+
+type CacheLine struct {
+	// TODO: Do we really need a self-reference?
+	uuidAndHash []byte
+
+	// Various kinds of data...
+	Asset    *[]byte
+	Info     *[]byte
+	Resource *[]byte
+}
+
+func (c CacheLine) Get(kind byte) ([]byte, bool) {
+	switch kind {
+	case TYPE_ASSET:
+		return *c.Asset, c.Asset != nil
+	case TYPE_INFO:
+		return *c.Info, c.Info != nil
+	case TYPE_RESOURCE:
+		return *c.Resource, c.Resource != nil
+	}
+	return nil, false
+}
+
+func (c CacheLine) Has(kind byte) bool {
+	switch kind {
+	case TYPE_ASSET:
+		return c.Asset != nil
+	case TYPE_INFO:
+		return c.Info != nil
+	case TYPE_RESOURCE:
+		return c.Resource != nil
+	default:
+		return false
+	}
+}
+
+func (c *CacheLine) Put(kind byte, data []byte) error {
+	log.Printf("CacheLine.Put %c %x", kind, data)
+	switch kind {
+	case TYPE_ASSET:
+		c.Asset = &data
+	case TYPE_INFO:
+		c.Info = &data
+	case TYPE_RESOURCE:
+		c.Resource = &data
+	default:
+		return errors.New("Trying to put unknown resource")
+	}
+	return nil
+}
+
 type CacheMemory struct {
-	data map[string][]byte
+	data map[string]CacheLine
 }
 
 func NewCacheMemory() *CacheMemory {
-	return &CacheMemory{data: make(map[string][]byte)}
+	return &CacheMemory{data: make(map[string]CacheLine)}
 }
 
 func (c *CacheMemory) Has(kind byte, uuidAndHash []byte) (bool, error) {
 	log.Printf("CacheMemory.Has %c %s", kind, PrettyUuidAndHash(uuidAndHash))
-	key := fmt.Sprintf("%x%s", kind, uuidAndHash)
-
-	_, ok := c.data[key]
-	return ok, nil
+	if entry, ok := c.data[string(uuidAndHash)]; ok {
+		return entry.Has(kind), nil
+	}
+	return false, nil
 }
 
-func (c *CacheMemory) Put(kind byte, uuidAndHash []byte, data []byte) error {
-	log.Printf("CacheMemory.Put %c %s", kind, PrettyUuidAndHash(uuidAndHash))
-	key := fmt.Sprintf("%x%s", kind, uuidAndHash)
+func (c *CacheMemory) Put(uuidAndHash []byte, data CacheLine) error {
+	log.Printf("CacheMemory.Put %s", PrettyUuidAndHash(uuidAndHash))
+	c.data[string(uuidAndHash)] = data
 
-	c.data[key] = data
 	return nil
 }
 
 func (c *CacheMemory) Get(kind byte, uuidAndHash []byte) ([]byte, error) {
 	log.Printf("CacheMemory.Get %c %s", kind, PrettyUuidAndHash(uuidAndHash))
-	key := fmt.Sprintf("%x%s", kind, uuidAndHash)
 
-	if data, ok := c.data[key]; ok {
-		return data, nil
+	if data, ok := c.data[string(uuidAndHash)]; ok {
+		bytes, _ := data.Get(kind)
+		return bytes, nil
 	}
 
 	return []byte{}, nil
@@ -140,8 +196,7 @@ func handleRequest(conn net.Conn) {
 
 	cache := NewCacheMemory()
 	trx := make([]byte, 0)
-	var trxType byte
-	var trxData []byte
+	trxData := CacheLine{}
 
 	// First, read uint32 version number
 	version, err := readUint32Helper(rw)
@@ -258,15 +313,14 @@ func handleRequest(conn net.Conn) {
 				return
 			}
 
-			err := cache.Put(trxType, trx, trxData)
+			err := cache.Put(trx, trxData)
 			if err != nil {
 				log.Println("Error ending trx - cache put error:", err)
 				continue
 			}
 
 			trx = []byte{}
-			trxType = 0
-			trxData = []byte{}
+			trxData = CacheLine{}
 			continue
 		}
 
@@ -290,14 +344,14 @@ func handleRequest(conn net.Conn) {
 			}
 			log.Println("PUT / SIZE", size)
 
-			trxData = make([]byte, size)
-			_, err = io.ReadFull(rw, trxData)
+			// TODO: Cache should probably have the reader embedded
+			tmp := make([]byte, size)
+			_, err = io.ReadFull(rw, tmp)
 			if err != nil {
 				log.Println("Error putting - cannot read data:", err)
 				return
 			}
-
-			trxType = cmdType
+			trxData.Put(cmdType, tmp)
 			continue
 		}
 
