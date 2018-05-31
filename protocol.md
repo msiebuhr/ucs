@@ -39,6 +39,19 @@ client --- 'gr' (id <128bit GUID><128bit HASH>) --> server
 client <-- '+r' (size <uint64>) (id <128bit GUID><128bit HASH>) + size bytes --- server	(found in cache)
 client <-- '-r' (id <128bit GUID><128bit HASH>) --- server (not found in cache)
 ```
+
+Cache miss:
+
+    grUUIDUUIDUUIDUUIDHASHHASHHASHHASH # uuid/hash is sent as 32 bytes
+    -rUUIDUUIDUUIDUUIDHASHHASHHASHHASH # negative response
+
+Cache hit:
+
+    grUUIDUUIDUUIDUUIDHASHHASHHASHHASH
+    +r00000000000000ffUUIDUUIDUUIDUUIDHASHHASHHASHHASH<0xff / 255 bytes of data>
+
+Note that the size is sent as 16 bytes encoded as hexadecimal
+
 ## Putting items
 
 Multiple entries (asset, info and resources) exist for one item in the server,
@@ -64,7 +77,7 @@ client --- 'te' --> server
 
 An example transaction could be (newlines added for readability)
 
-    ts00000000000000ff00000000000000ee # Start transaction for GUID ff / hash ee
+    ts00000000000000ff00000000000000ee # Start transaction for GUID ff / hash ee (32 bytes in total, raw binary stuff)
     pi0000000000000008                 # Put eight bytes of info
     INFOBLOB                           # Eight bytes of info
     pa0000000000000008                 # Put eight bytes of data
