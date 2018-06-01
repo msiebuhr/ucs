@@ -1,8 +1,9 @@
 package ucs
 
 import (
-	"log"
 	"errors"
+	"io"
+	"log"
 )
 
 type CacheLine struct {
@@ -55,6 +56,18 @@ func (c *CacheLine) Put(kind byte, data []byte) error {
 	return nil
 }
 
+// Put data from a reader into the cacheline. The kind and number of bytes
+// to be read as well
+func (c *CacheLine) PutReader(kind byte, size uint64, r io.Reader) error {
+	log.Printf("CacheLine.PutReader %c %db", kind, size)
+	tmp := make([]byte, size)
+	_, err := io.ReadFull(r, tmp)
+	if err != nil {
+		return err
+	}
+	return c.Put(kind, tmp)
+}
+
 type CacheMemory struct {
 	data map[string]CacheLine
 }
@@ -88,4 +101,3 @@ func (c *CacheMemory) Get(kind byte, uuidAndHash []byte) ([]byte, error) {
 
 	return []byte{}, nil
 }
-

@@ -260,13 +260,7 @@ func handleRequest(conn net.Conn) {
 			log.Println("PUT / SIZE", size)
 
 			// TODO: Cache should probably have the reader embedded
-			tmp := make([]byte, size)
-			_, err = io.ReadFull(rw, tmp)
-			if err != nil {
-				log.Println("Error putting - cannot read data:", err)
-				return
-			}
-			trxData.Put(cmdType, tmp)
+			trxData.PutReader(cmdType, size, rw)
 			continue
 		}
 
