@@ -18,15 +18,23 @@ type CacheLine struct {
 }
 
 func (c CacheLine) Get(kind byte) ([]byte, bool) {
+	var ptr *[]byte
 	switch kind {
 	case TYPE_ASSET:
-		return *c.Asset, c.Asset != nil
+		ptr = c.Asset
 	case TYPE_INFO:
-		return *c.Info, c.Info != nil
+		ptr = c.Info
 	case TYPE_RESOURCE:
-		return *c.Resource, c.Resource != nil
+		ptr = c.Resource
+	default:
+		return []byte{}, false
 	}
-	return nil, false
+
+	if ptr == nil {
+		return nil, false
+	}
+
+	return *ptr, true
 }
 
 func (c CacheLine) Has(kind byte) bool {
@@ -43,7 +51,7 @@ func (c CacheLine) Has(kind byte) bool {
 }
 
 func (c *CacheLine) Put(kind byte, data []byte) error {
-	log.Printf("CacheLine.Put %c %x", kind, data)
+	log.Printf("CacheLine.Put %c %dB", kind, len(data))
 	switch kind {
 	case TYPE_ASSET:
 		c.Asset = &data
