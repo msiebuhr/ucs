@@ -2,6 +2,7 @@ package ucs
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -12,7 +13,7 @@ func TestHandshakes(t *testing.T) {
 	// Send the regular hex string '00fe'
 	client, server := net.Pipe()
 
-	go handleRequest(server)
+	go handleRequest(context.Background(), server)
 
 	go func() {
 		client.Write([]byte("000000fe"))
@@ -30,7 +31,7 @@ func TestHandshakes(t *testing.T) {
 
 func TestInvalidVersionHandshake(t *testing.T) {
 	client, server := net.Pipe()
-	go handleRequest(server)
+	go handleRequest(context.Background(), server)
 
 	go func() {
 		client.Write([]byte("000000ff"))
@@ -47,7 +48,7 @@ func TestInvalidVersionHandshake(t *testing.T) {
 
 func TestShortVersionHandshake(t *testing.T) {
 	client, server := net.Pipe()
-	go handleRequest(server)
+	go handleRequest(context.Background(), server)
 
 	go func() {
 		client.Write([]byte("fe"))
@@ -65,7 +66,7 @@ func TestShortVersionHandshake(t *testing.T) {
 
 func TestGACacheMiss(t *testing.T) {
 	client, server := net.Pipe()
-	go handleRequest(server)
+	go handleRequest(context.Background(), server)
 
 	request := fmt.Sprintf("%08xga%016s%016sq", 0xfe, "dead", "beef")
 	go client.Write([]byte(request))
@@ -82,7 +83,7 @@ func TestGACacheMiss(t *testing.T) {
 
 func TestGACachePutAndGet(t *testing.T) {
 	client, server := net.Pipe()
-	go handleRequest(server)
+	go handleRequest(context.Background(), server)
 
 	data := []byte("Here is some very lovely test information for ya'")
 
@@ -108,7 +109,7 @@ func TestGACachePutAndGet(t *testing.T) {
 
 func TestCacheMultiPutAndGet(t *testing.T) {
 	client, server := net.Pipe()
-	go handleRequest(server)
+	go handleRequest(context.Background(), server)
 
 	data := []byte("Here is some very lovely test information for ya'")
 

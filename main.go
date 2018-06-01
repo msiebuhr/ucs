@@ -45,7 +45,7 @@ func Listen(ctx context.Context) {
 			os.Exit(1)
 		}
 		// Handle connections in a new goroutine.
-		go handleRequest(conn)
+		go handleRequest(ctx, conn)
 	}
 }
 
@@ -79,7 +79,7 @@ func readVersionNumber(rw *bufio.ReadWriter) (uint32, error) {
 }
 
 // Handles incoming requests.
-func handleRequest(conn net.Conn) {
+func handleRequest(ctx context.Context, conn net.Conn) {
 	defer func() {
 		log.Println("Closing connection")
 		conn.Close()
@@ -90,7 +90,7 @@ func handleRequest(conn net.Conn) {
 	// Set deadline for getting data five seconds in the future
 	conn.SetDeadline(time.Now().Add(2 * time.Second))
 
-	cache := NewCacheMemory()
+	cache := NewCacheMemory(ctx)
 	trx := make([]byte, 0)
 	trxData := CacheLine{}
 
