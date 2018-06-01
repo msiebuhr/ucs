@@ -51,7 +51,7 @@ func Listen(ctx context.Context) {
 
 type Handler func(*bufio.ReadWriter)
 
-func readUint32Helper(rw *bufio.ReadWriter) (uint32, error) {
+func readVersionNumber(rw *bufio.ReadWriter) (uint32, error) {
 	// Peek at some data so we force it to wait for some data so we don't get
 	// zero buffer sizes all the time...
 	rw.Reader.Peek(2)
@@ -78,25 +78,6 @@ func readUint32Helper(rw *bufio.ReadWriter) (uint32, error) {
 	return uint32(n), err
 }
 
-func readTwoByteCommand(rw *bufio.ReadWriter) (string, error) {
-	byteone, err := rw.ReadByte()
-	if err != nil {
-		return "", err
-	}
-
-	// 'q' is a one-byte command, so return that if seen...
-	if byteone == 'q' {
-		return "q", nil
-	}
-
-	bytetwo, err := rw.ReadByte()
-	if err != nil {
-		return "", err
-	}
-
-	return string(byteone) + string(bytetwo), nil
-}
-
 // Handles incoming requests.
 func handleRequest(conn net.Conn) {
 	defer func() {
@@ -114,7 +95,7 @@ func handleRequest(conn net.Conn) {
 	trxData := CacheLine{}
 
 	// First, read uint32 version number
-	version, err := readUint32Helper(rw)
+	version, err := readVersionNumber(rw)
 	if err != nil {
 		log.Printf("Could not read client version: %s", err)
 		return
@@ -142,13 +123,11 @@ func handleRequest(conn net.Conn) {
 		log.Printf("Flushing")
 		rw.Flush()
 
-		//cmd, err := readTwoByteCommand(rw)
 		cmd, err := rw.ReadByte()
 		if err != nil {
 			log.Println("Error reading command:", err)
 			return
 		}
-
 		log.Printf("Got command %c", cmd)
 
 		// Quit command
@@ -163,7 +142,6 @@ func handleRequest(conn net.Conn) {
 			log.Println("Error reading command type:", err)
 			return
 		}
-
 		log.Printf("Got command type %c", cmdType)
 
 		// GET
