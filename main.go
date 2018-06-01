@@ -88,7 +88,7 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 	defer rw.Flush()
 
 	// Set deadline for getting data five seconds in the future
-	conn.SetDeadline(time.Now().Add(2 * time.Second))
+	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	cache := NewCacheMemory(ctx)
 	trx := make([]byte, 0)
@@ -100,6 +100,7 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 		log.Printf("Could not read client version: %s", err)
 		return
 	}
+	ctx = context.WithValue(ctx, "version", version)
 
 	// Bail on unknown versions
 	if version != 0xfe {
@@ -114,13 +115,12 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 
 	for {
 		// Extend Read-dealine by five seconds for each command we process
-		conn.SetDeadline(time.Now().Add(2 * time.Second))
+		conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 		// Flush version or previous command
 		// The original server get really confused if clients do agressive
 		// streaming. Explicitly waiting for output from previous command
 		// seem to make it happy...
-		log.Printf("Flushing")
 		rw.Flush()
 
 		cmd, err := rw.ReadByte()
@@ -128,11 +128,10 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 			log.Println("Error reading command:", err)
 			return
 		}
-		log.Printf("Got command %c", cmd)
 
 		// Quit command
 		if cmd == 'q' {
-			log.Println("Quitting")
+			log.Printf("Got command %c; Quitting", cmd)
 			return
 		}
 
@@ -142,7 +141,7 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 			log.Println("Error reading command type:", err)
 			return
 		}
-		log.Printf("Got command type %c", cmdType)
+		log.Printf("Got command %c/%c", cmd, cmdType)
 
 		// GET
 		if cmd == 'g' {
@@ -177,7 +176,6 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 
 		// Transaction start
 		if cmd == 't' && cmdType == 's' {
-			log.Printf("Transaction start")
 			// Bail if we're already in a command
 			if len(trx) > 0 {
 				log.Println("Error starting trx inside trx")
@@ -200,7 +198,6 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 
 		// Transaction end
 		if cmd == 't' && cmdType == 'e' {
-			log.Printf("Transaction end")
 			if len(trx) == 0 {
 				log.Println("Error ending trx - none started")
 				return
@@ -219,7 +216,6 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 
 		// Put
 		if cmd == 'p' {
-			log.Println("PUT")
 			// Read size
 			sizeBytes := make([]byte, 16)
 			_, err := io.ReadFull(rw, sizeBytes)
@@ -227,7 +223,6 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 				log.Println("Error putting - cannot read size:", err)
 				return
 			}
-			log.Println("PUT / SIZE BYTES", string(sizeBytes))
 
 			// Parse size
 			size, err := strconv.ParseUint(string(sizeBytes), 16, 64)
@@ -235,7 +230,7 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 				log.Printf("Error putting - cannot parse size '%x': %s", sizeBytes, err)
 				return
 			}
-			log.Println("PUT / SIZE", size)
+			log.Println("Put, size", string(sizeBytes), size)
 
 			// TODO: Cache should probably have the reader embedded
 			trxData.PutReader(cmdType, size, rw)
