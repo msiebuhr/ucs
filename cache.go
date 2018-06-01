@@ -1,7 +1,6 @@
 package ucs
 
 import (
-	"context"
 	"errors"
 	"io"
 	"log"
@@ -81,7 +80,7 @@ type CacheMemory struct {
 	data map[string]CacheLine
 }
 
-func NewCacheMemory(ctx context.Context) *CacheMemory {
+func NewCacheMemory() *CacheMemory {
 	return &CacheMemory{data: make(map[string]CacheLine)}
 }
 

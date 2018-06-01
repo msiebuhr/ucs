@@ -27,6 +27,12 @@ const (
 	CONN_PORT = ":8126"
 )
 
+type Server struct {
+	cache *CacheMemory
+}
+
+// TODO: Setupcode for server
+
 // Listen for commands
 func Listen(ctx context.Context) {
 	l, err := net.Listen(CONN_TYPE, CONN_PORT)
@@ -34,6 +40,11 @@ func Listen(ctx context.Context) {
 		fmt.Println("Error listening:", err.Error())
 		os.Exit(1)
 	}
+
+	server := Server{
+		cache: NewCacheMemory(),
+	}
+
 	// Close the listener when the application closes.
 	defer l.Close()
 	fmt.Println("Listening on " + CONN_TYPE + ":" + CONN_PORT)
@@ -45,11 +56,9 @@ func Listen(ctx context.Context) {
 			os.Exit(1)
 		}
 		// Handle connections in a new goroutine.
-		go handleRequest(ctx, conn)
+		go server.handleRequest(ctx, conn)
 	}
 }
-
-type Handler func(*bufio.ReadWriter)
 
 func readVersionNumber(rw *bufio.ReadWriter) (uint32, error) {
 	// Peek at some data so we force it to wait for some data so we don't get
@@ -79,7 +88,7 @@ func readVersionNumber(rw *bufio.ReadWriter) (uint32, error) {
 }
 
 // Handles incoming requests.
-func handleRequest(ctx context.Context, conn net.Conn) {
+func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	defer func() {
 		log.Println("Closing connection")
 		conn.Close()
@@ -90,7 +99,6 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 	// Set deadline for getting data five seconds in the future
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
-	cache := NewCacheMemory(ctx)
 	trx := make([]byte, 0)
 	trxData := CacheLine{}
 
@@ -151,7 +159,7 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 
 			log.Printf("Get / %c %s", cmdType, PrettyUuidAndHash(uuidAndHash))
 
-			ok, err := cache.Has(cmdType, uuidAndHash)
+			ok, err := s.cache.Has(cmdType, uuidAndHash)
 			if err != nil {
 				log.Println("Error reading from cache:", err)
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
@@ -163,7 +171,7 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 				continue
 			}
 
-			data, err := cache.Get(cmdType, uuidAndHash)
+			data, err := s.cache.Get(cmdType, uuidAndHash)
 			if err != nil {
 				log.Println("Error reading from cache:", err)
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
@@ -203,7 +211,7 @@ func handleRequest(ctx context.Context, conn net.Conn) {
 				return
 			}
 
-			err := cache.Put(trx, trxData)
+			err := s.cache.Put(trx, trxData)
 			if err != nil {
 				log.Println("Error ending trx - cache put error:", err)
 				continue
