@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"sync"
 )
 
 type CacheLine struct {
@@ -77,6 +78,7 @@ func (c *CacheLine) PutReader(kind byte, size uint64, r io.Reader) error {
 }
 
 type CacheMemory struct {
+	lock sync.RWMutex
 	data map[string]CacheLine
 }
 
@@ -85,6 +87,8 @@ func NewCacheMemory() *CacheMemory {
 }
 
 func (c *CacheMemory) Has(kind byte, uuidAndHash []byte) (bool, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 	log.Printf("CacheMemory.Has %c %s", kind, PrettyUuidAndHash(uuidAndHash))
 	if entry, ok := c.data[string(uuidAndHash)]; ok {
 		return entry.Has(kind), nil
@@ -93,6 +97,8 @@ func (c *CacheMemory) Has(kind byte, uuidAndHash []byte) (bool, error) {
 }
 
 func (c *CacheMemory) Put(uuidAndHash []byte, data CacheLine) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	log.Printf("CacheMemory.Put %s", PrettyUuidAndHash(uuidAndHash))
 	c.data[string(uuidAndHash)] = data
 
@@ -100,6 +106,8 @@ func (c *CacheMemory) Put(uuidAndHash []byte, data CacheLine) error {
 }
 
 func (c *CacheMemory) Get(kind byte, uuidAndHash []byte) ([]byte, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 	log.Printf("CacheMemory.Get %c %s", kind, PrettyUuidAndHash(uuidAndHash))
 
 	if data, ok := c.data[string(uuidAndHash)]; ok {
