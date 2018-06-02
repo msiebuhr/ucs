@@ -12,7 +12,7 @@ import (
 func TestHandshakes(t *testing.T) {
 	// Send the regular hex string '00fe'
 	client, server := net.Pipe()
-	s := Server{cache: NewCacheMemory()}
+	s := NewServer()
 	go s.handleRequest(context.Background(), server)
 
 	go func() {
@@ -31,7 +31,7 @@ func TestHandshakes(t *testing.T) {
 
 func TestInvalidVersionHandshake(t *testing.T) {
 	client, server := net.Pipe()
-	s := Server{cache: NewCacheMemory()}
+	s := NewServer()
 	go s.handleRequest(context.Background(), server)
 
 	go func() {
@@ -49,7 +49,7 @@ func TestInvalidVersionHandshake(t *testing.T) {
 
 func TestShortVersionHandshake(t *testing.T) {
 	client, server := net.Pipe()
-	s := Server{cache: NewCacheMemory()}
+	s := NewServer()
 	go s.handleRequest(context.Background(), server)
 
 	go func() {
@@ -68,7 +68,7 @@ func TestShortVersionHandshake(t *testing.T) {
 
 func TestGACacheMiss(t *testing.T) {
 	client, server := net.Pipe()
-	s := Server{cache: NewCacheMemory()}
+	s := NewServer()
 	go s.handleRequest(context.Background(), server)
 
 	request := fmt.Sprintf("%08xga%016s%016sq", 0xfe, "dead", "beef")
@@ -86,7 +86,7 @@ func TestGACacheMiss(t *testing.T) {
 
 func TestGACachePutAndGet(t *testing.T) {
 	client, server := net.Pipe()
-	s := Server{cache: NewCacheMemory()}
+	s := NewServer()
 	go s.handleRequest(context.Background(), server)
 
 	data := []byte("Here is some very lovely test information for ya'")
@@ -113,7 +113,7 @@ func TestGACachePutAndGet(t *testing.T) {
 
 func TestCacheMultiPutAndGet(t *testing.T) {
 	client, server := net.Pipe()
-	s := Server{cache: NewCacheMemory()}
+	s := Server{Cache: NewCacheMemory()}
 	go s.handleRequest(context.Background(), server)
 
 	data := []byte("Here is some very lovely test information for ya'")

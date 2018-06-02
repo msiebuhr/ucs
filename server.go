@@ -22,21 +22,26 @@ const (
 )
 
 type Server struct {
-	cache *CacheMemory
+	Cache *CacheMemory
 }
 
-// TODO: Setupcode for server
+// Set up a new server
+func NewServer(options ...func(*Server)) *Server {
+	s := &Server{Cache: NewCacheMemory()}
+
+	for _, f := range options {
+		f(s)
+	}
+
+	return s
+}
 
 // Listen for commands
-func Listen(ctx context.Context) {
+func (s *Server) Listen(ctx context.Context) {
 	l, err := net.Listen(CONN_TYPE, CONN_PORT)
 	if err != nil {
 		fmt.Println("Error listening:", err.Error())
 		os.Exit(1)
-	}
-
-	server := Server{
-		cache: NewCacheMemory(),
 	}
 
 	// Close the listener when the application closes.
@@ -50,7 +55,7 @@ func Listen(ctx context.Context) {
 			os.Exit(1)
 		}
 		// Handle connections in a new goroutine.
-		go server.handleRequest(ctx, conn)
+		go s.handleRequest(ctx, conn)
 	}
 }
 
@@ -153,7 +158,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			log.Printf("Get / %c %s", cmdType, PrettyUuidAndHash(uuidAndHash))
 
-			ok, err := s.cache.Has(Kind(cmdType), uuidAndHash)
+			ok, err := s.Cache.Has(Kind(cmdType), uuidAndHash)
 			if err != nil {
 				log.Println("Error reading from cache:", err)
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
@@ -165,7 +170,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 				continue
 			}
 
-			data, err := s.cache.Get(Kind(cmdType), uuidAndHash)
+			data, err := s.Cache.Get(Kind(cmdType), uuidAndHash)
 			if err != nil {
 				log.Println("Error reading from cache:", err)
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
@@ -205,7 +210,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 				return
 			}
 
-			err := s.cache.Put(trx, trxData)
+			err := s.Cache.Put(trx, trxData)
 			if err != nil {
 				log.Println("Error ending trx - cache put error:", err)
 				continue

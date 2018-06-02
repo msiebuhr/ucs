@@ -7,5 +7,7 @@ import (
 )
 
 func main() {
-	ucs.Listen(context.Background())
+	server := ucs.NewServer()
+
+	server.Listen(context.Background())
 }
