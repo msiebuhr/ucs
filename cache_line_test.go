@@ -6,7 +6,7 @@ import (
 )
 
 func TestCacheLineGetHasSet(t *testing.T) {
-	kinds := []byte{'a', 'i', 'r'}
+	kinds := []Kind{KIND_ASSET, KIND_INFO, KIND_RESOURCE}
 
 	for _, kind := range kinds {
 		c := CacheLine{}
@@ -23,7 +23,7 @@ func TestCacheLineGetHasSet(t *testing.T) {
 			}
 
 			putData := []byte("X Data goes here!")
-			putData[0] = kind
+			putData[0] = byte(kind)
 
 			err := c.Put(kind, putData)
 			if err != nil {

@@ -11,7 +11,7 @@ func TestCacheMemorySimple(t *testing.T) {
 	rand.Read(key)
 
 	// Negative lookup
-	ok, err := c.Has(TYPE_INFO, key)
+	ok, err := c.Has(KIND_INFO, key)
 	if err != nil {
 		t.Fatalf("Unexpected error calling Has(): %s", err)
 	}
@@ -29,7 +29,7 @@ func TestCacheMemorySimple(t *testing.T) {
 	}
 
 	// Try again
-	ok, err = c.Has(TYPE_INFO, key)
+	ok, err = c.Has(KIND_INFO, key)
 	if err != nil {
 		t.Fatalf("Unexpected error calling Has(): %s", err)
 	}

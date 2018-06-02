@@ -17,12 +17,6 @@ func PrettyUuidAndHash(d []byte) string {
 }
 
 const (
-	TYPE_ASSET    = 'a'
-	TYPE_INFO     = 'i'
-	TYPE_RESOURCE = 'r'
-)
-
-const (
 	CONN_TYPE = "tcp"
 	CONN_PORT = ":8126"
 )
@@ -159,7 +153,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			log.Printf("Get / %c %s", cmdType, PrettyUuidAndHash(uuidAndHash))
 
-			ok, err := s.cache.Has(cmdType, uuidAndHash)
+			ok, err := s.cache.Has(Kind(cmdType), uuidAndHash)
 			if err != nil {
 				log.Println("Error reading from cache:", err)
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
@@ -171,7 +165,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 				continue
 			}
 
-			data, err := s.cache.Get(cmdType, uuidAndHash)
+			data, err := s.cache.Get(Kind(cmdType), uuidAndHash)
 			if err != nil {
 				log.Println("Error reading from cache:", err)
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
@@ -241,7 +235,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			log.Println("Put, size", string(sizeBytes), size)
 
 			// TODO: Cache should probably have the reader embedded
-			trxData.PutReader(cmdType, size, rw)
+			trxData.PutReader(Kind(cmdType), size, rw)
 			continue
 		}
 

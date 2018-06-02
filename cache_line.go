@@ -16,14 +16,14 @@ type CacheLine struct {
 	Resource *[]byte
 }
 
-func (c CacheLine) Get(kind byte) ([]byte, bool) {
+func (c CacheLine) Get(kind Kind) ([]byte, bool) {
 	var ptr *[]byte
 	switch kind {
-	case TYPE_ASSET:
+	case KIND_ASSET:
 		ptr = c.Asset
-	case TYPE_INFO:
+	case KIND_INFO:
 		ptr = c.Info
-	case TYPE_RESOURCE:
+	case KIND_RESOURCE:
 		ptr = c.Resource
 	default:
 		return []byte{}, false
@@ -36,27 +36,27 @@ func (c CacheLine) Get(kind byte) ([]byte, bool) {
 	return *ptr, true
 }
 
-func (c CacheLine) Has(kind byte) bool {
+func (c CacheLine) Has(kind Kind) bool {
 	switch kind {
-	case TYPE_ASSET:
+	case KIND_ASSET:
 		return c.Asset != nil
-	case TYPE_INFO:
+	case KIND_INFO:
 		return c.Info != nil
-	case TYPE_RESOURCE:
+	case KIND_RESOURCE:
 		return c.Resource != nil
 	default:
 		return false
 	}
 }
 
-func (c *CacheLine) Put(kind byte, data []byte) error {
+func (c *CacheLine) Put(kind Kind, data []byte) error {
 	log.Printf("CacheLine.Put %c %dB", kind, len(data))
 	switch kind {
-	case TYPE_ASSET:
+	case KIND_ASSET:
 		c.Asset = &data
-	case TYPE_INFO:
+	case KIND_INFO:
 		c.Info = &data
-	case TYPE_RESOURCE:
+	case KIND_RESOURCE:
 		c.Resource = &data
 	default:
 		return errors.New("Trying to put unknown resource")
@@ -66,7 +66,7 @@ func (c *CacheLine) Put(kind byte, data []byte) error {
 
 // Put data from a reader into the cacheline. The kind and number of bytes
 // to be read as well
-func (c *CacheLine) PutReader(kind byte, size uint64, r io.Reader) error {
+func (c *CacheLine) PutReader(kind Kind, size uint64, r io.Reader) error {
 	log.Printf("CacheLine.PutReader %c %db", kind, size)
 	tmp := make([]byte, size)
 	_, err := io.ReadFull(r, tmp)
