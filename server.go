@@ -171,7 +171,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
 				continue
 			}
-			fmt.Fprintf(rw, "+%c%08x%s", cmdType, len(data), uuidAndHash)
+			fmt.Fprintf(rw, "+%c%016x%s", cmdType, len(data), uuidAndHash)
 			rw.Write(data)
 			continue
 		}
