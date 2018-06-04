@@ -14,16 +14,6 @@ func NewCacheMemory() *CacheMemory {
 	return &CacheMemory{data: make(map[string]CacheLine)}
 }
 
-func (c *CacheMemory) Has(kind Kind, uuidAndHash []byte) (bool, error) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	log.Printf("CacheMemory.Has %c %s", kind, PrettyUuidAndHash(uuidAndHash))
-	if entry, ok := c.data[string(uuidAndHash)]; ok {
-		return entry.Has(kind), nil
-	}
-	return false, nil
-}
-
 func (c *CacheMemory) Put(uuidAndHash []byte, data CacheLine) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()

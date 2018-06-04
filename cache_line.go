@@ -36,19 +36,6 @@ func (c CacheLine) Get(kind Kind) ([]byte, bool) {
 	return *ptr, true
 }
 
-func (c CacheLine) Has(kind Kind) bool {
-	switch kind {
-	case KIND_ASSET:
-		return c.Asset != nil
-	case KIND_INFO:
-		return c.Info != nil
-	case KIND_RESOURCE:
-		return c.Resource != nil
-	default:
-		return false
-	}
-}
-
 func (c *CacheLine) Put(kind Kind, data []byte) error {
 	log.Printf("CacheLine.Put %c %dB", kind, len(data))
 	switch kind {

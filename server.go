@@ -161,21 +161,13 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			log.Printf("Get / %c %s", cmdType, PrettyUuidAndHash(uuidAndHash))
 
-			ok, err := s.Cache.Has(Kind(cmdType), uuidAndHash)
-			if err != nil {
-				log.Println("Error reading from cache:", err)
-				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
-				continue
-			}
-			if !ok {
-				log.Println("Cache miss")
-				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
-				continue
-			}
-
 			data, err := s.Cache.Get(Kind(cmdType), uuidAndHash)
 			if err != nil {
 				log.Println("Error reading from cache:", err)
+				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
+				continue
+			}
+			if len(data) == 0 {
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
 				continue
 			}
