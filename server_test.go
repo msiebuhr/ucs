@@ -105,7 +105,7 @@ func TestGACachePutAndGet(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error reading response: %s", err)
 	}
-	expected := fmt.Sprintf("%08x+i%08x%016s%016s", 0xfe, len(data), "dead", "beef") + string(data)
+	expected := fmt.Sprintf("%08x+i%016x%016s%016s", 0xfe, len(data), "dead", "beef") + string(data)
 	if !bytes.Equal(out, []byte(expected)) {
 		t.Errorf("Expected reply for request to be\n `%s`, got\n `%s`", expected, string(out))
 	}
@@ -135,7 +135,7 @@ func TestCacheMultiPutAndGet(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error reading response: %s", err)
 	}
-	expected := fmt.Sprintf("%08x+i%08x%016s%016s%s+a%08x%016s%016s%s", 0xfe, len(data), "dead", "beef", data, len(data), "dead", "beef", data)
+	expected := fmt.Sprintf("%08x+i%016x%016s%016s%s+a%016x%016s%016s%s", 0xfe, len(data), "dead", "beef", data, len(data), "dead", "beef", data)
 	if !bytes.Equal(out, []byte(expected)) {
 		t.Errorf("Expected reply for request to be\n `%s`, got\n `%s`", expected, string(out))
 	}
