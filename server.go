@@ -131,7 +131,10 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 		rw.Flush()
 
 		cmd, err := rw.ReadByte()
-		if err != nil {
+		if err == io.EOF {
+			log.Println("Client hangup; Quitting")
+			return
+		} else if err != nil {
 			log.Println("Error reading command:", err)
 			return
 		}
