@@ -20,14 +20,15 @@ func main() {
 	}
 	defer conn.Close()
 
+	c := ucs.NewClient(conn)
+
 	// Send version code and read answer
-	fmt.Fprintf(conn, "%08x", 0xfe)
-	versionBytes := make([]byte, 8)
-	_, err = io.ReadFull(conn, versionBytes)
+	version, err := c.NegotiateVersion(0xfe)
 	if err != nil {
 		log.Fatalf("Could not read returned version: %s", err)
+		return
 	}
-	log.Printf("Got version %s", versionBytes)
+	log.Printf("Got version %d", version)
 
 	// Make a random (failing) request
 	randomGuidAndHash := make([]byte, 32)
