@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestCacheMemorySimple(t *testing.T) {
-	c := NewCacheMemory()
+func TestMemorySimple(t *testing.T) {
+	c := NewMemory()
 	key := make([]byte, 32)
 	rand.Read(key)
 

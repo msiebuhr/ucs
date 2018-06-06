@@ -24,12 +24,12 @@ const (
 )
 
 type Server struct {
-	Cache *cache.CacheMemory
+	Cache *cache.Memory
 }
 
 // Set up a new server
 func NewServer(options ...func(*Server)) *Server {
-	s := &Server{Cache: cache.NewCacheMemory()}
+	s := &Server{Cache: cache.NewMemory()}
 
 	for _, f := range options {
 		f(s)
