@@ -5,11 +5,11 @@ import (
 	"testing"
 )
 
-func TestCacheLineGetHasSet(t *testing.T) {
+func TestLineGetHasSet(t *testing.T) {
 	kinds := []Kind{KIND_ASSET, KIND_INFO, KIND_RESOURCE}
 
 	for _, kind := range kinds {
-		c := CacheLine{}
+		c := Line{}
 		t.Run(string(kind), func(t *testing.T) {
 
 			data, ok := c.Get(kind)

@@ -6,7 +6,7 @@ import (
 	"log"
 )
 
-type CacheLine struct {
+type Line struct {
 	// TODO: Do we really need a self-reference?
 	uuidAndHash []byte
 
@@ -16,7 +16,7 @@ type CacheLine struct {
 	Resource *[]byte
 }
 
-func (c CacheLine) Get(kind Kind) ([]byte, bool) {
+func (c Line) Get(kind Kind) ([]byte, bool) {
 	var ptr *[]byte
 	switch kind {
 	case KIND_ASSET:
@@ -36,8 +36,8 @@ func (c CacheLine) Get(kind Kind) ([]byte, bool) {
 	return *ptr, true
 }
 
-func (c *CacheLine) Put(kind Kind, data []byte) error {
-	log.Printf("CacheLine.Put %c %dB", kind, len(data))
+func (c *Line) Put(kind Kind, data []byte) error {
+	log.Printf("Line.Put %c %dB", kind, len(data))
 	switch kind {
 	case KIND_ASSET:
 		c.Asset = &data
@@ -53,8 +53,8 @@ func (c *CacheLine) Put(kind Kind, data []byte) error {
 
 // Put data from a reader into the cacheline. The kind and number of bytes
 // to be read as well
-func (c *CacheLine) PutReader(kind Kind, size uint64, r io.Reader) error {
-	log.Printf("CacheLine.PutReader %c %db", kind, size)
+func (c *Line) PutReader(kind Kind, size uint64, r io.Reader) error {
+	log.Printf("Line.PutReader %c %db", kind, size)
 	tmp := make([]byte, size)
 	_, err := io.ReadFull(r, tmp)
 	if err != nil {

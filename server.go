@@ -101,7 +101,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	trx := make([]byte, 0)
-	trxData := cache.CacheLine{}
+	trxData := cache.Line{}
 
 	// First, read uint32 version number
 	version, err := readVersionNumber(rw)
@@ -214,7 +214,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			}
 
 			trx = []byte{}
-			trxData = cache.CacheLine{}
+			trxData = cache.Line{}
 			continue
 		}
 

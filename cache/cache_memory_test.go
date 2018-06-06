@@ -22,7 +22,7 @@ func TestCacheMemorySimple(t *testing.T) {
 
 	// Put non-empty cacheline in
 	info := []byte("info")
-	cl := CacheLine{Info: &info}
+	cl := Line{Info: &info}
 
 	err = c.Put(key, cl)
 	if err != nil {

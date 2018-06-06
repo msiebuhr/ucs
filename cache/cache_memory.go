@@ -7,14 +7,14 @@ import (
 
 type CacheMemory struct {
 	lock sync.RWMutex
-	data map[string]CacheLine
+	data map[string]Line
 }
 
 func NewCacheMemory() *CacheMemory {
-	return &CacheMemory{data: make(map[string]CacheLine)}
+	return &CacheMemory{data: make(map[string]Line)}
 }
 
-func (c *CacheMemory) Put(uuidAndHash []byte, data CacheLine) error {
+func (c *CacheMemory) Put(uuidAndHash []byte, data Line) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	log.Printf("CacheMemory.Put %s", PrettyUuidAndHash(uuidAndHash))
