@@ -10,6 +10,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"gitlab.com/msiebuhr/ucs/cache"
 )
 
 func PrettyUuidAndHash(d []byte) string {
@@ -22,12 +24,12 @@ const (
 )
 
 type Server struct {
-	Cache *CacheMemory
+	Cache *cache.CacheMemory
 }
 
 // Set up a new server
 func NewServer(options ...func(*Server)) *Server {
-	s := &Server{Cache: NewCacheMemory()}
+	s := &Server{Cache: cache.NewCacheMemory()}
 
 	for _, f := range options {
 		f(s)
@@ -99,7 +101,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	trx := make([]byte, 0)
-	trxData := CacheLine{}
+	trxData := cache.CacheLine{}
 
 	// First, read uint32 version number
 	version, err := readVersionNumber(rw)
@@ -161,7 +163,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			log.Printf("Get / %c %s", cmdType, PrettyUuidAndHash(uuidAndHash))
 
-			data, err := s.Cache.Get(Kind(cmdType), uuidAndHash)
+			data, err := s.Cache.Get(cache.Kind(cmdType), uuidAndHash)
 			if err != nil {
 				log.Println("Error reading from cache:", err)
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
@@ -212,7 +214,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			}
 
 			trx = []byte{}
-			trxData = CacheLine{}
+			trxData = cache.CacheLine{}
 			continue
 		}
 
@@ -235,7 +237,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			log.Println("Put, size", string(sizeBytes), size)
 
 			// TODO: Cache should probably have the reader embedded
-			trxData.PutReader(Kind(cmdType), size, rw)
+			trxData.PutReader(cache.Kind(cmdType), size, rw)
 			continue
 		}
 

@@ -1,4 +1,4 @@
-package ucs
+package cache
 
 // Denotes which kind of data goes in the cache
 type Kind byte
