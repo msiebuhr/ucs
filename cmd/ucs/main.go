@@ -9,5 +9,5 @@ import (
 func main() {
 	server := ucs.NewServer()
 
-	server.Listen(context.Background())
+	server.Listen(context.Background(), "tcp", ":8126")
 }

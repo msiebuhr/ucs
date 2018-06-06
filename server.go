@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"os"
 	"strconv"
 	"time"
 
@@ -17,11 +16,6 @@ import (
 func PrettyUuidAndHash(d []byte) string {
 	return fmt.Sprintf("%x/%x", d[:16], d[17:])
 }
-
-const (
-	CONN_TYPE = "tcp"
-	CONN_PORT = ":8126"
-)
 
 type Server struct {
 	Cache *cache.Memory
@@ -38,23 +32,25 @@ func NewServer(options ...func(*Server)) *Server {
 	return s
 }
 
-// Listen for commands
-func (s *Server) Listen(ctx context.Context) {
-	l, err := net.Listen(CONN_TYPE, CONN_PORT)
+func (s *Server) Listen(ctx context.Context, network, address string) error {
+	listener, err := net.Listen(network, address)
 	if err != nil {
-		fmt.Println("Error listening:", err.Error())
-		os.Exit(1)
+		log.Println("Error listening:", err.Error())
+		return err
 	}
+	defer listener.Close()
+	log.Printf("Listening on %s", listener.Addr())
 
-	// Close the listener when the application closes.
-	defer l.Close()
-	fmt.Println("Listening on " + CONN_TYPE + ":" + CONN_PORT)
+	return s.Listener(ctx, listener)
+}
+
+func (s *Server) Listener(ctx context.Context, listener net.Listener) error {
 	for {
 		// Listen for an incoming connection.
-		conn, err := l.Accept()
+		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Println("Error accepting: ", err.Error())
-			os.Exit(1)
+			log.Println("Error accepting: ", err.Error())
+			continue
 		}
 		// Handle connections in a new goroutine.
 		go s.handleRequest(ctx, conn)
