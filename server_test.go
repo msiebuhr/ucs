@@ -7,8 +7,6 @@ import (
 	"io/ioutil"
 	"net"
 	"testing"
-
-	"gitlab.com/msiebuhr/ucs/cache"
 )
 
 func TestHandshakes(t *testing.T) {
@@ -115,7 +113,7 @@ func TestGACachePutAndGet(t *testing.T) {
 
 func TestCacheMultiPutAndGet(t *testing.T) {
 	client, server := net.Pipe()
-	s := Server{Cache: cache.NewMemory()}
+	s := NewServer()
 	go s.handleRequest(context.Background(), server)
 
 	data := []byte("Here is some very lovely test information for ya'")
