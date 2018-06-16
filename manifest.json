@@ -1,0 +1,7 @@
+{
+    "dependencies": {
+        "github.com/namsral/flag": {
+            "revision": "67f268f20922975c067ed799e4be6bacf152208c"
+        }
+    }
+}

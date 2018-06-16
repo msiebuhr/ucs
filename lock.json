@@ -1,0 +1,12 @@
+{
+    "memo": "bef738b8898cce0cc28a86db4215fd1b736483ec11d77c8095cd50b58e508fe2",
+    "projects": [
+        {
+            "name": "github.com/namsral/flag",
+            "revision": "67f268f20922975c067ed799e4be6bacf152208c",
+            "packages": [
+                "."
+            ]
+        }
+    ]
+}
