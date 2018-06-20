@@ -29,7 +29,7 @@ func NewFS(options ...func(*FS)) (*FS, error) {
 	return fs, nil
 }
 
-func (fs FS) generatePath(kind Kind, uuidAndHash []byte) string {
+func (fs *FS) generatePath(kind Kind, uuidAndHash []byte) string {
 	return filepath.Join(fs.Basepath, fmt.Sprintf("%02x", uuidAndHash[:1]), fmt.Sprintf("%032x.%c", uuidAndHash, kind))
 }
 
