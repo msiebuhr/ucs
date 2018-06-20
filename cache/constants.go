@@ -12,3 +12,9 @@ const (
 func (k Kind) String() string {
 	return string(k)
 }
+
+// Cacher is the interface to be implemented by caches
+type Cacher interface {
+	Put([]byte, Line) error
+	Get(Kind, []byte) ([]byte, error)
+}

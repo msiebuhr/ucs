@@ -19,7 +19,7 @@ func PrettyUuidAndHash(d []byte) string {
 }
 
 type Server struct {
-	Cache *cache.Memory
+	Cache cache.Cacher
 	Log   *log.Logger
 }
 
