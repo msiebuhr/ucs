@@ -223,6 +223,12 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 		// Put
 		if cmd == 'p' {
+			// Bail on wrong CMD-types
+			if cmdType != 'a' && cmdType != 'i' && cmdType != 'r' {
+				s.Log.Printf("Error putting - invalid type %s", []byte{cmdType})
+				return
+			}
+
 			// Read size
 			sizeBytes := make([]byte, 16)
 			_, err := io.ReadFull(rw, sizeBytes)

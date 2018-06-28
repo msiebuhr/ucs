@@ -146,6 +146,27 @@ func TestCacheMultiPutAndGet(t *testing.T) {
 	}
 }
 
+
+func TestWrongCmdType(t *testing.T) {
+	client, server := net.Pipe()
+	s := NewServer()
+	go s.handleRequest(context.Background(), server)
+
+	go func() {
+		client.Write([]byte("000000fepX0000000000000001x"))
+	}()
+
+	out, err := ioutil.ReadAll(client)
+	if err != nil {
+		t.Errorf("Error reading response: %s", err)
+	}
+	expected := fmt.Sprintf("%08x", 0xfe)
+	if !bytes.Equal(out, []byte(expected)) {
+		t.Errorf("Expected reply for request to be\n `%s`, got\n `%s`", expected, string(out))
+	}
+}
+
+// Quick benchmarking
 func BenchmarkMemory1mb(b *testing.B) {
 	s := NewServer(
 	//func (l *Server) {l.Log = log.New(os.Stdout, "", 0)}
