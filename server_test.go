@@ -4,9 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
+	"os"
 	"testing"
+
+	"gitlab.com/msiebuhr/ucs/cache"
 )
 
 func TestHandshakes(t *testing.T) {
@@ -139,4 +144,57 @@ func TestCacheMultiPutAndGet(t *testing.T) {
 	if !bytes.Equal(out, []byte(expected)) {
 		t.Errorf("Expected reply for request to be\n `%s`, got\n `%s`", expected, string(out))
 	}
+}
+
+func BenchmarkMemory1mb(b *testing.B) {
+	s := NewServer(
+	//func (l *Server) {l.Log = log.New(os.Stdout, "", 0)}
+	)
+
+	HelpBenchmarkServerGets(b, s, 1024*1024)
+}
+
+func BenchmarkFS1mb(b *testing.B) {
+	c, err := cache.NewFS(func(f *cache.FS) { f.Basepath = "./testdata" })
+	if err != nil {
+		b.Fatalf("Error creating FS: %s", err)
+	}
+
+	defer func() {
+		os.RemoveAll(c.Basepath)
+	}()
+
+	s := NewServer(
+		//func (l *Server) {l.Log = log.New(os.Stdout, "", 0)}
+		func(s *Server) { s.Cache = c },
+	)
+
+	HelpBenchmarkServerGets(b, s, 1024*1024)
+}
+
+func HelpBenchmarkServerGets(b *testing.B, s *Server, size int64) {
+	client, server := net.Pipe()
+	go s.handleRequest(context.Background(), server)
+
+	// Handshake
+	fmt.Fprintf(client, "%08x", 0xfe)
+	io.CopyN(ioutil.Discard, client, 8)
+
+	// Put stuff
+	data := make([]byte, size)
+	rand.Read(data)
+	b.SetBytes(size)
+	fmt.Fprintf(client, "ts%016s%016s", "dead", "beef")
+	fmt.Fprintf(client, "pi%016x", size)
+	client.Write(data)
+	fmt.Fprintf(client, "te")
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i += 1 {
+		fmt.Fprintf(client, "gi%016s%016s", "dead", "beef")
+		io.CopyN(ioutil.Discard, client, 2+16+32+size)
+	}
+
+	client.Write([]byte("q"))
 }
