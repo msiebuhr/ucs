@@ -12,7 +12,45 @@ import (
 	"time"
 
 	"gitlab.com/msiebuhr/ucs/cache"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+var (
+	ops = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ucs_server_ops",
+		Help: "Operations performed on the server",
+	}, []string{"op"})
+	getCacheHit = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ucs_server_get_hits",
+		Help: "Hit/miss upon get'ing from the cache",
+	}, []string{"type", "hit"})
+	getBytes = prometheus.NewSummaryVec(prometheus.SummaryOpts{
+		Name: "ucs_server_get_bytes",
+		Help: "Bytes fetched fom server",
+	}, []string{"type"})
+	putBytes = prometheus.NewSummaryVec(prometheus.SummaryOpts{
+		Name: "ucs_server_put_bytes",
+		Help: "Bytes sent fom server",
+	}, []string{"type"})
+	getDurations = prometheus.NewSummaryVec(prometheus.SummaryOpts{
+		Name: "ucs_server_get_duration_seconds",
+		Help: "Time spent sending data",
+	}, []string{"type"})
+	putDurations = prometheus.NewSummaryVec(prometheus.SummaryOpts{
+		Name: "ucs_server_put_duration_seconds",
+		Help: "Time spent recieving data",
+	}, []string{"type"})
+)
+
+func init() {
+	prometheus.MustRegister(ops)
+	prometheus.MustRegister(getCacheHit)
+	prometheus.MustRegister(getBytes)
+	prometheus.MustRegister(putBytes)
+	prometheus.MustRegister(getDurations)
+	prometheus.MustRegister(putDurations)
+}
 
 func PrettyUuidAndHash(d []byte) string {
 	return fmt.Sprintf("%x/%x", d[:16], d[17:])
@@ -91,6 +129,7 @@ func readVersionNumber(rw *bufio.ReadWriter) (uint32, error) {
 
 // Handles incoming requests.
 func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
+	start := time.Now()
 	defer func() {
 		s.Log.Println("Closing connection")
 		conn.Close()
@@ -144,6 +183,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 		// Quit command
 		if cmd == 'q' {
+			ops.WithLabelValues("q").Inc()
 			s.Log.Printf("Got command %c; Quitting", cmd)
 			return
 		}
@@ -156,8 +196,12 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 		}
 		s.Log.Printf("Got command %c/%c", cmd, cmdType)
 
+		start = time.Now()
+
 		// GET
 		if cmd == 'g' {
+			ops.WithLabelValues("g").Inc()
+
 			// Read uuidAndHash
 			uuidAndHash := make([]byte, 32)
 			_, err := io.ReadFull(rw, uuidAndHash)
@@ -166,11 +210,13 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			data, err := s.Cache.Get(cache.Kind(cmdType), uuidAndHash)
 			if err != nil {
+				getCacheHit.WithLabelValues(string(cmdType), "miss").Inc()
 				s.Log.Println("Error reading from cache:", err)
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
 				continue
 			}
 			if len(data) == 0 {
+				getCacheHit.WithLabelValues(string(cmdType), "miss").Inc()
 				s.Log.Println("Cache miss")
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
 				continue
@@ -178,11 +224,16 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			fmt.Fprintf(rw, "+%c%016x%s", cmdType, len(data), uuidAndHash)
 			rw.Write(data)
+			getCacheHit.WithLabelValues(string(cmdType), "hit").Inc()
+			getBytes.WithLabelValues(string(cmdType)).Observe(float64(len(data)))
+			getDurations.WithLabelValues(string(cmdType)).Observe(time.Now().Sub(start).Seconds())
 			continue
 		}
 
 		// Transaction start
 		if cmd == 't' && cmdType == 's' {
+			ops.WithLabelValues("ts").Inc()
+
 			// Bail if we're already in a command
 			if len(trx) > 0 {
 				s.Log.Println("Error starting trx inside trx")
@@ -205,6 +256,8 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 		// Transaction end
 		if cmd == 't' && cmdType == 'e' {
+			ops.WithLabelValues("te").Inc()
+
 			if len(trx) == 0 {
 				s.Log.Println("Error ending trx - none started")
 				return
@@ -223,6 +276,8 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 		// Put
 		if cmd == 'p' {
+			ops.WithLabelValues("p").Inc()
+
 			// Bail on wrong CMD-types
 			if cmdType != 'a' && cmdType != 'i' && cmdType != 'r' {
 				s.Log.Printf("Error putting - invalid type %s", []byte{cmdType})
@@ -247,10 +302,14 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			// TODO: Cache should probably have the reader embedded
 			trxData.PutReader(cache.Kind(cmdType), size, rw)
+
+			putBytes.WithLabelValues(string(cmdType)).Observe(float64(size))
+			putDurations.WithLabelValues(string(cmdType)).Observe(time.Now().Sub(start).Seconds())
 			continue
 		}
 
 		// Invalid command
+		ops.WithLabelValues("invalid").Inc()
 		s.Log.Printf("Invalid command: %c%c", cmd, cmdType)
 		return
 	}

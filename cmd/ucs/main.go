@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"log"
+	"net/http"
 
 	"gitlab.com/msiebuhr/ucs"
 	"gitlab.com/msiebuhr/ucs/cache"
 
 	"github.com/namsral/flag"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -41,6 +44,14 @@ func main() {
 	server := ucs.NewServer(
 		func(s *ucs.Server) { s.Cache = c },
 	)
+
+	// Expose metrics through an HTTP server
+	http.Handle("/metrics", promhttp.Handler())
+	go func() {
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			log.Println("ListenAndServe: ", err)
+		}
+	}()
 
 	server.Listen(context.Background(), "tcp", address)
 }
