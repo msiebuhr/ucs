@@ -146,7 +146,6 @@ func TestCacheMultiPutAndGet(t *testing.T) {
 	}
 }
 
-
 func TestWrongCmdType(t *testing.T) {
 	client, server := net.Pipe()
 	s := NewServer()
