@@ -1,11 +1,73 @@
 {
-    "memo": "bef738b8898cce0cc28a86db4215fd1b736483ec11d77c8095cd50b58e508fe2",
+    "memo": "1474a822e9c315e30e3315b19d3c6c9266d35780cc6540d93305c5d9c05a80ae",
     "projects": [
+        {
+            "name": "github.com/beorn7/perks",
+            "branch": "master",
+            "revision": "3a771d992973f24aa725d07868b467d1ddfceafb",
+            "packages": [
+                "quantile"
+            ]
+        },
+        {
+            "name": "github.com/golang/protobuf",
+            "version": "v1.1.0",
+            "revision": "b4deda0973fb4c70b50d226b1af49f3da59f5265",
+            "packages": [
+                "proto"
+            ]
+        },
+        {
+            "name": "github.com/matttproud/golang_protobuf_extensions",
+            "version": "v1.0.1",
+            "revision": "c12348ce28de40eed0136aa2b644d0ee0650e56c",
+            "packages": [
+                "pbutil"
+            ]
+        },
         {
             "name": "github.com/namsral/flag",
             "revision": "67f268f20922975c067ed799e4be6bacf152208c",
             "packages": [
                 "."
+            ]
+        },
+        {
+            "name": "github.com/prometheus/client_golang",
+            "version": "v0.8.0",
+            "revision": "c5b7fccd204277076155f10851dad72b76a49317",
+            "packages": [
+                "prometheus",
+                "prometheus/promhttp"
+            ]
+        },
+        {
+            "name": "github.com/prometheus/client_model",
+            "branch": "master",
+            "revision": "5c3871d89910bfb32f5fcab2aa4b9ec68e65a99f",
+            "packages": [
+                "go"
+            ]
+        },
+        {
+            "name": "github.com/prometheus/common",
+            "branch": "master",
+            "revision": "7600349dcfe1abd18d72d3a1770870d9800a7801",
+            "packages": [
+                "expfmt",
+                "internal/bitbucket.org/ww/goautoneg",
+                "model"
+            ]
+        },
+        {
+            "name": "github.com/prometheus/procfs",
+            "branch": "master",
+            "revision": "ae68e2d4c00fed4943b5f6698d504a5fe083da8a",
+            "packages": [
+                ".",
+                "internal/util",
+                "nfs",
+                "xfs"
             ]
         }
     ]
