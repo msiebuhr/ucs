@@ -15,11 +15,13 @@ import (
 var (
 	cacheBackend string
 	address      string
+	HTTPAddress      string
 )
 
 func init() {
 	flag.StringVar(&cacheBackend, "cache-backend", "fs", "Cache backend (fs or memory)")
 	flag.StringVar(&address, "address", ":8126", "Address and port to listen on")
+	flag.StringVar(&HTTPAddress, "http-address", ":9126", "Address and port for HTTP metrics/admin interface")
 }
 
 func main() {
@@ -48,7 +50,7 @@ func main() {
 	// Expose metrics through an HTTP server
 	http.Handle("/metrics", promhttp.Handler())
 	go func() {
-		if err := http.ListenAndServe(":8080", nil); err != nil {
+		if err := http.ListenAndServe(HTTPAddress, nil); err != nil {
 			log.Println("ListenAndServe: ", err)
 		}
 	}()
