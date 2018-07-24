@@ -15,7 +15,7 @@ import (
 var (
 	cacheBackend string
 	address      string
-	HTTPAddress      string
+	HTTPAddress  string
 )
 
 func init() {
