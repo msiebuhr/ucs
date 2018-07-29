@@ -64,7 +64,7 @@ type Server struct {
 // Set up a new server
 func NewServer(options ...func(*Server)) *Server {
 	s := &Server{
-		Cache: cache.NewMemory(),
+		Cache: cache.NewNOP(),
 		Log:   log.New(ioutil.Discard, "", 0),
 	}
 
