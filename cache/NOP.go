@@ -1,10 +1,9 @@
 package cache
 
-import (
-)
+import ()
 
 // Cache that discards all given data and never returns any hits
-type NOP struct { }
+type NOP struct{}
 
 // Create a new NOP instance
 func NewNOP() *NOP {

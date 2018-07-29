@@ -91,7 +91,7 @@ func TestGACacheMiss(t *testing.T) {
 
 func TestGACachePutAndGet(t *testing.T) {
 	client, server := net.Pipe()
-	s := NewServer( func (s *Server) { s.Cache = cache.NewMemory() },)
+	s := NewServer(func(s *Server) { s.Cache = cache.NewMemory(1e6) })
 	go s.handleRequest(context.Background(), server)
 
 	data := []byte("Here is some very lovely test information for ya'")
@@ -118,7 +118,7 @@ func TestGACachePutAndGet(t *testing.T) {
 
 func TestCacheMultiPutAndGet(t *testing.T) {
 	client, server := net.Pipe()
-	s := NewServer( func (s *Server) { s.Cache = cache.NewMemory() },)
+	s := NewServer(func(s *Server) { s.Cache = cache.NewMemory(1e6) })
 	go s.handleRequest(context.Background(), server)
 
 	data := []byte("Here is some very lovely test information for ya'")
