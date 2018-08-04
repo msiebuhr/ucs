@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
+	"time"
 )
 
 type FS struct {
@@ -27,6 +29,87 @@ func NewFS(options ...func(*FS)) (*FS, error) {
 	fs.Basepath = path
 
 	return fs, nil
+}
+
+// Remove old files (as measured by the most recent ATIME of any entry sharing
+// the same UUID/hash)
+// Also re-calculates the total size of cache directory, now we're at scanning
+// everything anyway...
+func (fs *FS) collectGarbage() {
+	fs.lock.Lock()
+	defer fs.lock.Unlock()
+
+	var old = make([]struct {
+		uuidAndHash string
+		size        int64
+		time        time.Time
+	}, 256)
+
+	var dirSizes = make([]int64, 256)
+
+	// There be 256 folders - let's find the oldest one + it's size
+	// TODO: Split into ~256 go-routines for speed
+	for i := 0; i < 256; i += 1 {
+		dirname := filepath.Join(fs.Basepath, fmt.Sprintf("%02x", i))
+		dir, err := os.Open(dirname)
+		if err != nil {
+			continue
+		}
+		entries, err := dir.Readdir(0)
+		if err != nil {
+			continue
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			dirSizes[i] += entry.Size()
+			// Try looking into entry.Sys()
+			var t time.Time
+
+			if stat_t, ok := entry.Sys().(*syscall.Stat_t); ok {
+				// Try extracting last access time
+				secs, nsec := stat_t.Atimespec.Unix()
+				t = time.Unix(secs, nsec)
+			} else {
+				// Fallback - modification time (usually, creationtime)
+				t = entry.ModTime()
+			}
+
+			if len(old[i].uuidAndHash) == 0 || t.Before(old[i].time) {
+				old[i].uuidAndHash = entry.Name() // TODO: Chop off extension
+				old[i].size = entry.Size()
+				old[i].time = t
+			}
+		}
+	}
+
+	var totalSize int64
+	var quota int64 = 1024 * 1024 * 1024 // 1 mb
+	for i := 0; i < 256; i += 1 {
+		totalSize += dirSizes[i]
+	}
+
+	// Ideally, we should delete the very oldest stuff first (and both info and
+	// asset/resource), and then re-scan that directory.
+	// But I'm lazy right now - let's just delete the oldst thing we found in
+	// all folders and see how far that get's us.
+
+	if totalSize > quota {
+		for i := 0; i < 256; i += 1 {
+			if old[i].uuidAndHash == "" {
+				continue
+			}
+
+			path := filepath.Join(fs.Basepath, fmt.Sprintf("%02x", i), old[i].uuidAndHash)
+
+			os.Remove(path)
+		}
+
+		// Start another GC to see if there's more to do.
+		go fs.collectGarbage()
+	}
 }
 
 func (fs *FS) generatePath(kind Kind, uuidAndHash []byte) string {
@@ -53,6 +136,7 @@ func (fs *FS) putKind(kind Kind, uuidAndHash, data []byte) error {
 func (fs *FS) Put(uuidAndHash []byte, data Line) error {
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
+	go fs.collectGarbage()
 
 	// Make sure leading directory exists!
 	leadingPath := filepath.Join(fs.Basepath, fmt.Sprintf("%02x", uuidAndHash[:1]))
