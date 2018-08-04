@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,7 +14,21 @@ import (
 	"gitlab.com/msiebuhr/ucs"
 )
 
+var (
+	size int64
+	seed int64
+)
+
+func init() {
+	flag.Int64Var(&size, "size", 1e9, "Bytes to upload")
+	flag.Int64Var(&seed, "seed", 1e9, "Random generator seed")
+}
+
 func main() {
+	flag.Parse()
+
+	rand.Seed(seed)
+
 	conn, err := net.Dial("tcp", ":8126")
 	if err != nil {
 		log.Fatalf("Could not connect: %s", err)
@@ -33,7 +48,8 @@ func main() {
 	// Make a random (failing) request
 	randomGuidAndHash := make([]byte, 32)
 	rand.Read(randomGuidAndHash)
-	fmt.Fprintf(conn, "gi%032s", randomGuidAndHash)
+	fmt.Fprintf(conn, "gi%s", randomGuidAndHash)
+
 	responseAndData := make([]byte, 2+32)
 	_, err = io.ReadFull(conn, responseAndData)
 	if err != nil {
@@ -43,14 +59,14 @@ func main() {
 
 	// Put something in the cache
 	rand.Read(randomGuidAndHash)
-	fmt.Fprintf(conn, "ts%032s", randomGuidAndHash)
-	data := make([]byte, 128)
+	fmt.Fprintf(conn, "ts%s", randomGuidAndHash)
+	data := make([]byte, size)
 	fmt.Fprintf(conn, "pi%016x%s", len(data), data)
 	fmt.Fprintf(conn, "pa%016x%s", len(data), data)
 	fmt.Fprintf(conn, "te")
 
 	// Get data back
-	fmt.Fprintf(conn, "gi%032s", randomGuidAndHash)
+	fmt.Fprintf(conn, "gi%s", randomGuidAndHash)
 	// Initial data - hit or not
 	dataType := make([]byte, 2)
 	_, err = io.ReadFull(conn, dataType)

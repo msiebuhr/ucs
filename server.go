@@ -184,7 +184,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 		// Quit command
 		if cmd == 'q' {
 			ops.WithLabelValues("q").Inc()
-			s.Log.Printf("Got command %c; Quitting", cmd)
+			s.Log.Printf("Got command '%c'; Quitting", cmd)
 			return
 		}
 
@@ -194,7 +194,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			s.Log.Println("Error reading command type:", err)
 			return
 		}
-		s.Log.Printf("Got command %c/%c", cmd, cmdType)
+		s.Log.Printf("Got command '%c'/'%c'", cmd, cmdType)
 
 		start = time.Now()
 
@@ -206,7 +206,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			uuidAndHash := make([]byte, 32)
 			_, err := io.ReadFull(rw, uuidAndHash)
 
-			s.Log.Printf("Get / %c %s", cmdType, PrettyUuidAndHash(uuidAndHash))
+			s.Log.Printf("Get '%c' '%s'", cmdType, PrettyUuidAndHash(uuidAndHash))
 
 			data, err := s.Cache.Get(cache.Kind(cmdType), uuidAndHash)
 			if err != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net"
 	"os"
@@ -160,6 +161,49 @@ func TestWrongCmdType(t *testing.T) {
 		t.Errorf("Error reading response: %s", err)
 	}
 	expected := fmt.Sprintf("%08x", 0xfe)
+	if !bytes.Equal(out, []byte(expected)) {
+		t.Errorf("Expected reply for request to be\n `%s`, got\n `%s`", expected, string(out))
+	}
+}
+
+func TestGACachePutAndGetKeyWithUTF8(t *testing.T) {
+	// I was lazy and uses fmt.Fprintf(conn, "%032s", [32]byte{...}). If
+	// byte contains any multi-byte unicode, it will be expanded to be 32
+	// characthers, making the byte-wise output too long in the other
+	// end...
+	client, server := net.Pipe()
+	s := NewServer(func(s *Server) {
+		s.Cache = cache.NewMemory(1e7)
+		s.Log = log.New(os.Stdout, "server: ", 0)
+	})
+	go s.handleRequest(context.Background(), server)
+
+	uuidAndHash := make([]byte, 32)
+	// Unicode for ☭
+	uuidAndHash[0] = 226
+	uuidAndHash[0] = 152
+	uuidAndHash[0] = 173
+
+	data := []byte("🍔")
+	//data := []byte("deadbeefdeadbeef")
+
+	go func() {
+		fmt.Fprintf(client, "%08x", 0xfe)
+		client.Write([]byte("ts"))
+		client.Write(uuidAndHash)
+		fmt.Fprintf(client, "pi%016x", len(data))
+		client.Write(data)
+		client.Write([]byte("te"))
+		client.Write([]byte("gi"))
+		client.Write(uuidAndHash)
+		client.Write([]byte("q"))
+	}()
+
+	out, err := ioutil.ReadAll(client)
+	if err != nil {
+		t.Errorf("Error reading response: %s", err)
+	}
+	expected := fmt.Sprintf("%08x+i%016x%s", 0xfe, len(data), uuidAndHash) + string(data)
 	if !bytes.Equal(out, []byte(expected)) {
 		t.Errorf("Expected reply for request to be\n `%s`, got\n `%s`", expected, string(out))
 	}
