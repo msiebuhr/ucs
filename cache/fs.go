@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -65,18 +64,8 @@ func (fs *FS) collectGarbage() {
 				continue
 			}
 			dirSizes[i] += entry.Size()
-			// Try looking into entry.Sys()
-			var t time.Time
 
-			if stat_t, ok := entry.Sys().(*syscall.Stat_t); ok {
-				// Try extracting last access time
-				secs, nsec := stat_t.Atimespec.Unix()
-				t = time.Unix(secs, nsec)
-			} else {
-				// Fallback - modification time (usually, creationtime)
-				t = entry.ModTime()
-			}
-
+			t := fileinfo_atime(entry)
 			if len(old[i].uuidAndHash) == 0 || t.Before(old[i].time) {
 				old[i].uuidAndHash = entry.Name() // TODO: Chop off extension
 				old[i].size = entry.Size()
