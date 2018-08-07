@@ -2,8 +2,8 @@ package cache
 
 import (
 	"os"
-	"time"
 	"syscall"
+	"time"
 )
 
 // Get A-time from a given os.Fileinfo
