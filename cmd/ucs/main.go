@@ -37,7 +37,7 @@ func main() {
 	switch cacheBackend {
 	case "fs":
 		var err error
-		c, err = cache.NewFS()
+		c, err = cache.NewFS(func (f *cache.FS) { f.Quota = int64(Quota) })
 		if err != nil {
 			panic(err)
 		}
