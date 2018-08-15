@@ -78,11 +78,11 @@ func NewServer(options ...func(*Server)) *Server {
 func (s *Server) Listen(ctx context.Context, network, address string) error {
 	listener, err := net.Listen(network, address)
 	if err != nil {
-		s.Log.Println("Error listening:", err.Error())
+		s.log(ctx, "Error listening:", err.Error())
 		return err
 	}
 	defer listener.Close()
-	s.Log.Printf("Listening on %s", listener.Addr())
+	s.logf(ctx, "Listening on %s", listener.Addr())
 
 	return s.Listener(ctx, listener)
 }
@@ -92,12 +92,34 @@ func (s *Server) Listener(ctx context.Context, listener net.Listener) error {
 		// Listen for an incoming connection.
 		conn, err := listener.Accept()
 		if err != nil {
-			s.Log.Println("Error accepting: ", err.Error())
+			s.log(ctx, "Error accepting: ", err.Error())
 			continue
 		}
 		// Handle connections in a new goroutine.
-		go s.handleRequest(ctx, conn)
+		connCtx := context.WithValue(ctx, "addr", conn.RemoteAddr().String())
+		go s.handleRequest(connCtx, conn)
 	}
+}
+
+func (s *Server) log(ctx context.Context, rest ...interface{}) {
+	// Extract and sort values from ctx
+	values := make([]interface{}, 0)
+
+	keys := []string{"namespace", "addr"}
+	for _, key := range keys {
+		value := ctx.Value(key)
+		if (value!=nil) {
+			values = append(values, fmt.Sprintf("%s=%s", key, value))
+		}
+	}
+
+	values = append(values, rest...)
+
+	s.Log.Println(values...)
+}
+
+func (s *Server) logf(ctx context.Context, format string, rest ...interface{}) {
+	s.log(ctx, fmt.Sprintf(format, rest...))
 }
 
 func readVersionNumber(rw *bufio.ReadWriter) (uint32, error) {
@@ -131,7 +153,7 @@ func readVersionNumber(rw *bufio.ReadWriter) (uint32, error) {
 func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	start := time.Now()
 	defer func() {
-		s.Log.Println("Closing connection")
+		s.log(ctx, "Closing connection")
 		conn.Close()
 	}()
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
@@ -146,20 +168,20 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	// First, read uint32 version number
 	version, err := readVersionNumber(rw)
 	if err != nil {
-		s.Log.Printf("Could not read client version: %s", err)
+		s.logf(ctx, "Could not read client version: %s", err)
 		return
 	}
 	ctx = context.WithValue(ctx, "version", version)
 
 	// Bail on unknown versions
 	if version != 0xfe {
-		s.Log.Printf("Got invalid client version %d", version)
+		s.logf(ctx, "Got invalid client version %d", version)
 		fmt.Fprintf(rw, "%08x", 0)
 		return
 	}
 
 	// Protocol says to echo version if everything is ok
-	s.Log.Printf("Got client version %d", version)
+	s.logf(ctx, "Got client version %d", version)
 	fmt.Fprintf(rw, "%08x", version)
 
 	for {
@@ -174,27 +196,27 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 		cmd, err := rw.ReadByte()
 		if err == io.EOF {
-			s.Log.Println("Client hangup; Quitting")
+			s.log(ctx, "Client hangup; Quitting")
 			return
 		} else if err != nil {
-			s.Log.Println("Error reading command:", err)
+			s.log(ctx, "Error reading command:", err)
 			return
 		}
 
 		// Quit command
 		if cmd == 'q' {
 			ops.WithLabelValues("q").Inc()
-			s.Log.Printf("Got command '%c'; Quitting", cmd)
+			s.logf(ctx, "Got command '%c'; Quitting", cmd)
 			return
 		}
 
 		// Get type
 		cmdType, err := rw.ReadByte()
 		if err != nil {
-			s.Log.Println("Error reading command type:", err)
+			s.log(ctx, "Error reading command type:", err)
 			return
 		}
-		s.Log.Printf("Got command '%c'/'%c'", cmd, cmdType)
+		s.logf(ctx, "Got command '%c'/'%c'", cmd, cmdType)
 
 		start = time.Now()
 
@@ -206,18 +228,18 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			uuidAndHash := make([]byte, 32)
 			_, err := io.ReadFull(rw, uuidAndHash)
 
-			s.Log.Printf("Get '%c' '%s'", cmdType, PrettyUuidAndHash(uuidAndHash))
+			s.logf(ctx, "Get '%c' '%s'", cmdType, PrettyUuidAndHash(uuidAndHash))
 
 			data, err := s.Cache.Get(cache.Kind(cmdType), uuidAndHash)
 			if err != nil {
 				getCacheHit.WithLabelValues(string(cmdType), "miss").Inc()
-				s.Log.Println("Error reading from cache:", err)
+				s.log(ctx, "Error reading from cache:", err)
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
 				continue
 			}
 			if len(data) == 0 {
 				getCacheHit.WithLabelValues(string(cmdType), "miss").Inc()
-				s.Log.Println("Cache miss")
+				s.log(ctx, "Cache miss")
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
 				continue
 			}
@@ -236,7 +258,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			// Bail if we're already in a command
 			if len(trx) > 0 {
-				s.Log.Println("Error starting trx inside trx")
+				s.log(ctx, "Error starting trx inside trx")
 				return
 			}
 
@@ -244,11 +266,11 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			uuidAndHash := make([]byte, 32)
 			_, err := io.ReadFull(rw, uuidAndHash)
 			if err != nil {
-				s.Log.Println("Error reading uuid+hash:", err)
+				s.log(ctx, "Error reading uuid+hash:", err)
 				return
 			}
 
-			s.Log.Printf("Transaction started for %s", PrettyUuidAndHash(uuidAndHash))
+			s.logf(ctx, "Transaction started for %s", PrettyUuidAndHash(uuidAndHash))
 
 			trx = uuidAndHash
 			continue
@@ -259,13 +281,13 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			ops.WithLabelValues("te").Inc()
 
 			if len(trx) == 0 {
-				s.Log.Println("Error ending trx - none started")
+				s.log(ctx, "Error ending trx - none started")
 				return
 			}
 
 			err := s.Cache.Put(trx, trxData)
 			if err != nil {
-				s.Log.Println("Error ending trx - cache put error:", err)
+				s.log(ctx, "Error ending trx - cache put error:", err)
 				continue
 			}
 
@@ -280,7 +302,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			// Bail on wrong CMD-types
 			if cmdType != 'a' && cmdType != 'i' && cmdType != 'r' {
-				s.Log.Printf("Error putting - invalid type %s", []byte{cmdType})
+				s.logf(ctx, "Error putting - invalid type %s", []byte{cmdType})
 				return
 			}
 
@@ -288,17 +310,17 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			sizeBytes := make([]byte, 16)
 			_, err := io.ReadFull(rw, sizeBytes)
 			if err != nil {
-				s.Log.Println("Error putting - cannot read size:", err)
+				s.log(ctx, "Error putting - cannot read size:", err)
 				return
 			}
 
 			// Parse size
 			size, err := strconv.ParseUint(string(sizeBytes), 16, 64)
 			if err != nil {
-				s.Log.Printf("Error putting - cannot parse size '%x': %s", sizeBytes, err)
+				s.logf(ctx, "Error putting - cannot parse size '%x': %s", sizeBytes, err)
 				return
 			}
-			s.Log.Println("Put, size", string(sizeBytes), size)
+			s.log(ctx, "Put, size", string(sizeBytes), size)
 
 			// TODO: Cache should probably have the reader embedded
 			trxData.PutReader(cache.Kind(cmdType), size, rw)
@@ -310,7 +332,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 		// Invalid command
 		ops.WithLabelValues("invalid").Inc()
-		s.Log.Printf("Invalid command: %c%c", cmd, cmdType)
+		s.logf(ctx, "Invalid command: %c%c", cmd, cmdType)
 		return
 	}
 }
