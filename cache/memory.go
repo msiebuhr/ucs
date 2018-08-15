@@ -7,7 +7,7 @@ import (
 type memoryEntry struct {
 	data       map[Kind][]byte
 	generation int
-	size       int
+	size       int64
 }
 
 func memoryEntryFromLine(generation int, line Line) memoryEntry {
@@ -19,15 +19,15 @@ func memoryEntryFromLine(generation int, line Line) memoryEntry {
 
 	if data, ok := line.Get(KIND_ASSET); ok {
 		m.data[KIND_ASSET] = data
-		m.size += len(data)
+		m.size += int64(len(data))
 	}
 	if data, ok := line.Get(KIND_INFO); ok {
 		m.data[KIND_INFO] = data
-		m.size += len(data)
+		m.size += int64(len(data))
 	}
 	if data, ok := line.Get(KIND_RESOURCE); ok {
 		m.data[KIND_RESOURCE] = data
-		m.size += len(data)
+		m.size += int64(len(data))
 	}
 
 	return m
@@ -43,18 +43,18 @@ type Memory struct {
 	data map[string]memoryEntry
 
 	// Track current size, quota
-	size  int
-	quota int
+	size  int64
+	quota int64
 
 	// Monotonically increasing counter to track age of objects
 	generation int
 }
 
-func NewMemory(quota int) *Memory {
+func NewMemory(quota int64) *Memory {
 	return &Memory{quota: quota, data: make(map[string]memoryEntry)}
 }
 
-func (m *Memory) collectGarbage(spaceToMake int) {
+func (m *Memory) collectGarbage(spaceToMake int64) {
 	//m.lock.Lock()
 	//defer m.lock.Unlock()
 
