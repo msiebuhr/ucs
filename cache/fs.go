@@ -131,7 +131,12 @@ func (fs *FS) putKind(kind Kind, uuidAndHash, data []byte) error {
 func (fs *FS) Put(uuidAndHash []byte, data Line) error {
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
-	go fs.collectGarbage()
+
+	// Kick of GC if we're above the size
+	fs.Size += data.Size()
+	if fs.Size > fs.Quota {
+		go fs.collectGarbage()
+	}
 
 	// Make sure leading directory exists!
 	leadingPath := filepath.Join(fs.Basepath, fmt.Sprintf("%02x", uuidAndHash[:1]))
