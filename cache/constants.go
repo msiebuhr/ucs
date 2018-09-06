@@ -1,5 +1,9 @@
 package cache
 
+import (
+	"io"
+)
+
 // Denotes which kind of data goes in the cache
 type Kind byte
 
@@ -17,4 +21,5 @@ func (k Kind) String() string {
 type Cacher interface {
 	Put([]byte, Line) error
 	Get(Kind, []byte) ([]byte, error)
+	GetReader(Kind, []byte) (int64, io.ReadCloser, error) // Size, reader and error
 }

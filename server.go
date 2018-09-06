@@ -230,24 +230,28 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			s.logf(ctx, "Get '%c' '%s'", cmdType, PrettyUuidAndHash(uuidAndHash))
 
-			data, err := s.Cache.Get(cache.Kind(cmdType), uuidAndHash)
+			size, reader, err := s.Cache.GetReader(cache.Kind(cmdType), uuidAndHash)
 			if err != nil {
 				getCacheHit.WithLabelValues(string(cmdType), "miss").Inc()
 				s.log(ctx, "Error reading from cache:", err)
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
 				continue
 			}
-			if len(data) == 0 {
+			if size == 0 {
 				getCacheHit.WithLabelValues(string(cmdType), "miss").Inc()
 				s.log(ctx, "Cache miss")
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
+				if reader != nil {
+					reader.Close()
+				}
 				continue
 			}
 
-			fmt.Fprintf(rw, "+%c%016x%s", cmdType, len(data), uuidAndHash)
-			rw.Write(data)
+			fmt.Fprintf(rw, "+%c%016x%s", cmdType, size, uuidAndHash)
+			io.Copy(rw, reader)
+			reader.Close()
 			getCacheHit.WithLabelValues(string(cmdType), "hit").Inc()
-			getBytes.WithLabelValues(string(cmdType)).Observe(float64(len(data)))
+			getBytes.WithLabelValues(string(cmdType)).Observe(float64(size))
 			getDurations.WithLabelValues(string(cmdType)).Observe(time.Now().Sub(start).Seconds())
 			continue
 		}
