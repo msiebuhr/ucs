@@ -52,9 +52,15 @@ func (c *Line) Put(kind Kind, data []byte) error {
 func (l Line) Size() int64 {
 	size := 0
 
-	if l.Asset != nil { size += len(*l.Asset) }
-	if l.Info != nil { size += len(*l.Info) }
-	if l.Resource != nil { size += len(*l.Resource) }
+	if l.Asset != nil {
+		size += len(*l.Asset)
+	}
+	if l.Info != nil {
+		size += len(*l.Info)
+	}
+	if l.Resource != nil {
+		size += len(*l.Resource)
+	}
 
 	return int64(size)
 }
