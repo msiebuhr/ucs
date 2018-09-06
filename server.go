@@ -108,7 +108,7 @@ func (s *Server) log(ctx context.Context, rest ...interface{}) {
 	keys := []string{"namespace", "addr"}
 	for _, key := range keys {
 		value := ctx.Value(key)
-		if (value!=nil) {
+		if value != nil {
 			values = append(values, fmt.Sprintf("%s=%s", key, value))
 		}
 	}
