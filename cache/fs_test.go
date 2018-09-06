@@ -31,7 +31,7 @@ func TestFSGeneratePath(t *testing.T) {
 }
 
 func TestFSSimple(t *testing.T) {
-	c, err := NewFS(func(f *FS) { f.Basepath = "./testdata" })
+	c, err := NewFS(func(f *FS) { f.Basepath = "./testdata"; f.Quota = 100 })
 	if err != nil {
 		t.Fatalf("Error creating FS: %s", err)
 	}
@@ -68,4 +68,42 @@ func TestFSSimple(t *testing.T) {
 	if !bytes.Equal(data, info) {
 		t.Errorf("Expected Get() to return %s, got %s", info, data)
 	}
+}
+
+func TestFSQuota(t *testing.T) {
+	f, err := NewFS(func(f *FS) { f.Quota = 100; f.Basepath = "./testdata" })
+	if err != nil {
+		t.Fatalf("Error creating FS: %s", err)
+	}
+
+	keys := make([][]byte, 100)
+
+	// Insert 100 keys
+	for i := 0; i < len(keys); i++ {
+		keys[i] = make([]byte, 32)
+		rand.Read(keys[i])
+
+		cl := Line{Info: &[]byte{byte(i)}}
+		err := f.Put(keys[i], cl)
+		if err != nil {
+			t.Fatalf("Unexpected error calling Put(): %s", err)
+		}
+
+		// Run the garbage collector explicitly
+		f.collectGarbage()
+		if f.Size != int64(i)+1 {
+			t.Errorf("Expected cache size to be %d, got %d", i+1, f.Size)
+		}
+	}
+
+	// Put something large and check it is bumps everything else off
+	data := make([]byte, 100)
+	cl := Line{Info: &data}
+	f.Put(make([]byte, 32), cl)
+
+	// Run GC and check size is around 100
+	f.collectGarbage()
+	//if len(n.data) != 1 {
+	//	t.Errorf("Expected cache length to be 1, has %d", len(c.data))
+	//}
 }

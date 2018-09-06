@@ -17,7 +17,7 @@ var (
 	cacheBackend string
 	address      string
 	HTTPAddress  string
-	Quota        int
+	quota        int64
 	verbose      bool
 )
 
@@ -25,7 +25,7 @@ func init() {
 	flag.StringVar(&cacheBackend, "cache-backend", "fs", "Cache backend (fs or memory)")
 	flag.StringVar(&address, "address", ":8126", "Address and port to listen on")
 	flag.StringVar(&HTTPAddress, "http-address", ":9126", "Address and port for HTTP metrics/admin interface")
-	flag.IntVar(&Quota, "quota", 1e9, "Storage quota in bytes")
+	flag.Int64Var(&quota, "quota", 1e9, "Storage quota in bytes")
 	flag.BoolVar(&verbose, "verbose", false, "Spew more info")
 }
 
@@ -37,12 +37,12 @@ func main() {
 	switch cacheBackend {
 	case "fs":
 		var err error
-		c, err = cache.NewFS()
+		c, err = cache.NewFS(func(f *cache.FS) { f.Quota = quota })
 		if err != nil {
 			panic(err)
 		}
 	case "memory":
-		c = cache.NewMemory(Quota)
+		c = cache.NewMemory(quota)
 	default:
 		// UNKNOWN BACKEND - BAIL/CRASH/QUIT
 		panic("Unknown backend " + cacheBackend)

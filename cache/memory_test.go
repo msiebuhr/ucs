@@ -54,7 +54,7 @@ func TestMemoryquota(t *testing.T) {
 			t.Fatalf("Unexpected error calling Put(): %s", err)
 		}
 
-		if c.size != i+1 {
+		if c.size != int64(i)+1 {
 			t.Errorf("Expected cache size to be %d, got %d", i+1, c.size)
 		}
 	}
