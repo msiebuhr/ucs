@@ -17,7 +17,7 @@ type FS struct {
 }
 
 func NewFS(options ...func(*FS)) (*FS, error) {
-	fs := &FS{Basepath: "./cache"}
+	fs := &FS{Basepath: "./cache5.0"}
 	for _, f := range options {
 		f(fs)
 	}
