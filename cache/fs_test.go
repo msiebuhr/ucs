@@ -91,9 +91,11 @@ func TestFSQuota(t *testing.T) {
 
 		// Run the garbage collector explicitly
 		f.collectGarbage()
+		f.lock.Lock()
 		if f.Size != int64(i)+1 {
 			t.Errorf("Expected cache size to be %d, got %d", i+1, f.Size)
 		}
+		f.lock.Unlock()
 	}
 
 	// Put something large and check it is bumps everything else off
