@@ -7,7 +7,31 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+
+var (
+	fs_gc_duration = prometheus.NewSummary(prometheus.SummaryOpts{
+		Name: "ucs_fscache_gc_duration_seconds",
+		Help: "Time spent deleting data",
+	})
+	fs_gc_bytes = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ucs_fscache_gc_removed_bytes",
+		Help: "Bytes deleted by GC",
+	})
+	fs_size = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ucs_fscache_size_bytes",
+		Help: "Size of cache in bytes",
+	})
+)
+
+func init() {
+	prometheus.MustRegister(fs_gc_duration)
+	prometheus.MustRegister(fs_gc_bytes)
+	prometheus.MustRegister(fs_size)
+}
 
 type FS struct {
 	lock     sync.RWMutex
@@ -15,6 +39,7 @@ type FS struct {
 	Size     int64
 	Quota    int64
 }
+
 
 func NewFS(options ...func(*FS)) (*FS, error) {
 	fs := &FS{Basepath: "./cache5.0"}
@@ -29,6 +54,9 @@ func NewFS(options ...func(*FS)) (*FS, error) {
 	}
 	fs.Basepath = path
 
+	// Kick off GC so we can get proper sizing info
+	go fs.collectGarbage()
+
 	return fs, nil
 }
 
@@ -37,7 +65,11 @@ func NewFS(options ...func(*FS)) (*FS, error) {
 // Also re-calculates the total size of cache directory, now we're at scanning
 // everything anyway...
 func (fs *FS) collectGarbage() {
+	start := time.Now()
+
 	fs.lock.Lock()
+
+	defer fs_gc_duration.Observe(time.Now().Sub(start).Seconds())
 	defer fs.lock.Unlock()
 
 	var old = make([]struct {
@@ -92,6 +124,7 @@ func (fs *FS) collectGarbage() {
 
 		err := os.Remove(path)
 		if err == nil {
+			fs_gc_bytes.Add(float64(old[i].size))
 			fs.Size -= old[i].size
 		}
 
@@ -100,6 +133,8 @@ func (fs *FS) collectGarbage() {
 			return
 		}
 	}
+
+	fs_size.Set(float64(fs.Size))
 
 	// If we're still over quota, do another round of GC'ing
 	if fs.Size > fs.Quota {
