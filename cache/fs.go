@@ -11,7 +11,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-
 var (
 	fs_gc_duration = prometheus.NewSummary(prometheus.SummaryOpts{
 		Name: "ucs_fscache_gc_duration_seconds",
@@ -39,7 +38,6 @@ type FS struct {
 	Size     int64
 	Quota    int64
 }
-
 
 func NewFS(options ...func(*FS)) (*FS, error) {
 	fs := &FS{Basepath: "./cache5.0"}
