@@ -44,7 +44,7 @@ compile:
 benchmark:
     stage: build
     script:
-        - go test -bench=. -run=NONE > $CI_PROJECT_DIR/benchmark.txt
+        - go test -bench=./... -run=NONE > $CI_PROJECT_DIR/benchmark.txt
     artifacts:
       paths:
         - benchmark.txt
