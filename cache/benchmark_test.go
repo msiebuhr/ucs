@@ -8,6 +8,8 @@ import (
 	"math/rand"
 	"os"
 	"testing"
+
+	"github.com/docker/go-units"
 )
 
 func benchmarkBackendSequentialRead(b *testing.B, c Cacher, size int64) {
@@ -86,10 +88,10 @@ func BenchmarkFSPositive(b *testing.B) {
 	}()
 
 	for _, size := range []int64{1024, 1024 * 128, 1024 * 1024, 1024 * 1024 * 128} {
-		b.Run(fmt.Sprintf("move,size=%d", size), func(b *testing.B) {
+		b.Run(fmt.Sprintf("move,size=%s", units.BytesSize(float64(size))), func(b *testing.B) {
 			benchmarkBackendSequentialRead(b, c, size)
 		})
-		b.Run(fmt.Sprintf("streaming,size=%d", size), func(b *testing.B) {
+		b.Run(fmt.Sprintf("streaming,size=%s", units.BytesSize(float64(size))), func(b *testing.B) {
 			benchmarkBackendSequentialReadBuf(b, c, size)
 		})
 	}
