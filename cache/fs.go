@@ -24,12 +24,17 @@ var (
 		Name: "ucs_fscache_size_bytes",
 		Help: "Size of cache in bytes",
 	})
+	fs_quota = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ucs_fscache_quota_bytes",
+		Help: "Size of quota in bytes",
+	})
 )
 
 func init() {
 	prometheus.MustRegister(fs_gc_duration)
 	prometheus.MustRegister(fs_gc_bytes)
 	prometheus.MustRegister(fs_size)
+	prometheus.MustRegister(fs_quota)
 }
 
 type FS struct {
@@ -133,6 +138,7 @@ func (fs *FS) collectGarbage() {
 	}
 
 	fs_size.Set(float64(fs.Size))
+	fs_quota.Set(float64(fs.Quota))
 
 	// If we're still over quota, do another round of GC'ing
 	if fs.Size > fs.Quota {
