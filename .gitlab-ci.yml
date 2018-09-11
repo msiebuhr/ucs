@@ -50,6 +50,8 @@ benchmark:
     stage: build
     script:
         - go test -bench=. -run=NONE ./... > $CI_PROJECT_DIR/benchmark.txt
+        - go test -bench=. -run=NONE -benchmem ./... > $CI_PROJECT_DIR/benchmark-mem.txt
     artifacts:
       paths:
         - benchmark.txt
+        - benchmark-mem.txt
