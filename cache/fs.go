@@ -147,7 +147,19 @@ func (fs *FS) collectGarbage() {
 }
 
 func (fs *FS) generatePath(kind Kind, uuidAndHash []byte) string {
-	return filepath.Join(fs.Basepath, fmt.Sprintf("%02x", uuidAndHash[:1]), fmt.Sprintf("%032x.%c", uuidAndHash, kind))
+	var suffix string
+	switch kind {
+	case KIND_ASSET:
+		suffix = "bin"
+	case KIND_INFO:
+		suffix = "info"
+	case KIND_RESOURCE:
+		suffix = "resource"
+	default:
+		suffix = ".UNKNOWN_TYPE"
+	}
+
+	return filepath.Join(fs.Basepath, fmt.Sprintf("%02x", uuidAndHash[:1]), fmt.Sprintf("%032x.%s", uuidAndHash, suffix))
 }
 
 func (fs *FS) putKind(kind Kind, uuidAndHash, data []byte) error {

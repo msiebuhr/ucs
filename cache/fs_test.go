@@ -18,8 +18,8 @@ func TestFSGeneratePath(t *testing.T) {
 	}
 	path := fs.generatePath(KIND_INFO, key)
 
-	// Ends with <key>.i
-	suffix := "/cache5.0/00/000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f.i"
+	// Ends with <key>.info
+	suffix := "/cache5.0/00/000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f.info"
 	if path[len(path)-len(suffix):] != suffix {
 		t.Errorf("Expected suffix '%s' in '%s'", suffix, path)
 	}
