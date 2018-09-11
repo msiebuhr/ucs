@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net"
 	"os"
@@ -174,7 +173,7 @@ func TestGACachePutAndGetKeyWithUTF8(t *testing.T) {
 	client, server := net.Pipe()
 	s := NewServer(func(s *Server) {
 		s.Cache = cache.NewMemory(1e7)
-		s.Log = log.New(os.Stdout, "server: ", 0)
+		//s.Log = log.New(os.Stdout, "server: ", 0)
 	})
 	go s.handleRequest(context.Background(), server)
 
