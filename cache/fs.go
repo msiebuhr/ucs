@@ -216,7 +216,7 @@ func (fs *FS) Put(uuidAndHash []byte, data Line) error {
 	return nil
 }
 
-func (fs *FS) GetReader(kind Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
+func (fs *FS) Get(kind Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
 	path := fs.generatePath(kind, uuidAndHash)
 
 	fs.lock.RLock()

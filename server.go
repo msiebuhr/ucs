@@ -230,7 +230,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			s.logf(ctx, "Get '%c' '%s'", cmdType, PrettyUuidAndHash(uuidAndHash))
 
-			size, reader, err := s.Cache.GetReader(cache.Kind(cmdType), uuidAndHash)
+			size, reader, err := s.Cache.Get(cache.Kind(cmdType), uuidAndHash)
 			if err != nil {
 				getCacheHit.WithLabelValues(string(cmdType), "miss").Inc()
 				s.log(ctx, "Error reading from cache:", err)

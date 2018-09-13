@@ -16,7 +16,7 @@ func (n *NOP) Put(uuidAndHash []byte, data Line) error {
 }
 
 // Return emoty readers
-func (n *NOP) GetReader(k Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
+func (n *NOP) Get(k Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
 	return 0, nil, nil
 	//return false, ioutil.NopCloser(strings.NewReader("")), nil)
 }

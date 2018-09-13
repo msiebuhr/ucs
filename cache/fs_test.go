@@ -45,12 +45,12 @@ func TestFSReader(t *testing.T) {
 	rand.Read(key)
 
 	// Negative lookup
-	size, reader, err := c.GetReader(KIND_INFO, key)
+	size, reader, err := c.Get(KIND_INFO, key)
 	if err != nil {
 		t.Fatalf("Unexpected error calling Get(): %#v", err)
 	}
 	if size != 0 {
-		t.Errorf("Expected GetReader() to return size=0, got %d", size)
+		t.Errorf("Expected Get() to return size=0, got %d", size)
 	}
 	if reader != nil {
 		t.Errorf("Got non-nil io.ReadCloser back: %+v", reader)
@@ -66,12 +66,12 @@ func TestFSReader(t *testing.T) {
 	}
 
 	// Try again
-	size, reader, err = c.GetReader(KIND_INFO, key)
+	size, reader, err = c.Get(KIND_INFO, key)
 	if err != nil {
-		t.Fatalf("Unexpected error calling GetReader(): %s", err)
+		t.Fatalf("Unexpected error calling Get(): %s", err)
 	}
 	if size != int64(len(info)) {
-		t.Errorf("Expected GetReader() to return size=%d, got %d", len(info), size)
+		t.Errorf("Expected Get() to return size=%d, got %d", len(info), size)
 	}
 	if reader == nil {
 		t.Error("Got nil io.ReadCloser back...", reader)

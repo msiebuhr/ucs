@@ -96,7 +96,7 @@ func (c *Memory) Put(uuidAndHash []byte, data Line) error {
 	return nil
 }
 
-func (c *Memory) GetReader(kind Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
+func (c *Memory) Get(kind Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 

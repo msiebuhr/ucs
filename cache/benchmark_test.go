@@ -30,7 +30,7 @@ func benchmarkBackendSequentialReadBuf(b *testing.B, c Cacher, size int64) {
 
 	// Try again
 	for i := 0; i < b.N; i += 1 {
-		size, reader, err := c.GetReader(KIND_INFO, key)
+		size, reader, err := c.Get(KIND_INFO, key)
 		if err != nil {
 			b.Fatalf("Unexpected error calling Has(): %s", err)
 		}
@@ -95,7 +95,7 @@ func BenchmarkFSPositiveStream(b *testing.B) {
 
 	// Try again
 	for i := 0; i < b.N; i += 1 {
-		size, reader, err := c.GetReader(KIND_INFO, key)
+		size, reader, err := c.Get(KIND_INFO, key)
 		if err != nil {
 			b.Fatalf("Unexpected error calling Has(): %s", err)
 		}
