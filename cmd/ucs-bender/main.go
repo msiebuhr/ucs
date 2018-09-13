@@ -25,7 +25,7 @@ func SyntheticCacheRequests(n int) chan interface{} {
 	// Generate things to go on the wire
 	go func() {
 		for i := 0; i < n; i++ {
-			buf := bytes.NewBufferString("000000feq")
+			buf := bytes.NewBufferString("000000fe")
 			// TODO: Get/put requests
 
 			// Generate 100 lookups
@@ -35,6 +35,7 @@ func SyntheticCacheRequests(n int) chan interface{} {
 				buf.Write([]byte("gi"))
 				buf.Write(guidAndHash)
 			}
+			buf.Write([]byte{'q'})
 			c <- buf
 		}
 		close(c)
