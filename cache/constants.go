@@ -20,6 +20,5 @@ func (k Kind) String() string {
 // Cacher is the interface to be implemented by caches
 type Cacher interface {
 	Put([]byte, Line) error
-	Get(Kind, []byte) ([]byte, error)
 	GetReader(Kind, []byte) (int64, io.ReadCloser, error) // Size, reader and error
 }

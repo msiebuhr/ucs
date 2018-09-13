@@ -15,11 +15,6 @@ func (n *NOP) Put(uuidAndHash []byte, data Line) error {
 	return nil
 }
 
-// Misses getting anything
-func (n *NOP) Get(kind Kind, uuidAndHash []byte) ([]byte, error) {
-	return []byte{}, nil
-}
-
 // Return emoty readers
 func (n *NOP) GetReader(k Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
 	return 0, nil, nil

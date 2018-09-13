@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,35 +10,6 @@ import (
 
 	"github.com/docker/go-units"
 )
-
-func benchmarkBackendSequentialRead(b *testing.B, c Cacher, size int64) {
-	key := make([]byte, 32)
-	rand.Read(key)
-
-	// Put non-empty cacheline in
-	info := make([]byte, size)
-	rand.Read(info)
-	cl := Line{Info: &info}
-
-	err := c.Put(key, cl)
-	if err != nil {
-		b.Fatalf("Unexpected error calling Put(): %s", err)
-	}
-
-	b.SetBytes(size)
-	b.ResetTimer()
-
-	// Try again
-	for i := 0; i < b.N; i += 1 {
-		data, err := c.Get(KIND_INFO, key)
-		if err != nil {
-			b.Fatalf("Unexpected error calling Has(): %s", err)
-		}
-		if !bytes.Equal(data, info) {
-			b.Errorf("Expected Get() to return len(%d), got len(%d)", len(info), len(data))
-		}
-	}
-}
 
 func benchmarkBackendSequentialReadBuf(b *testing.B, c Cacher, size int64) {
 	key := make([]byte, 32)
@@ -88,9 +58,6 @@ func BenchmarkFSPositive(b *testing.B) {
 	}()
 
 	for _, size := range []int64{1024, 1024 * 128, 1024 * 1024, 1024 * 1024 * 128} {
-		b.Run(fmt.Sprintf("move,size=%s", units.BytesSize(float64(size))), func(b *testing.B) {
-			benchmarkBackendSequentialRead(b, c, size)
-		})
 		b.Run(fmt.Sprintf("streaming,size=%s", units.BytesSize(float64(size))), func(b *testing.B) {
 			benchmarkBackendSequentialReadBuf(b, c, size)
 		})

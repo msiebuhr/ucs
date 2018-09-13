@@ -7,39 +7,6 @@ import (
 	"testing"
 )
 
-func TestMemorySimple(t *testing.T) {
-	c := NewMemory(1e6)
-	key := make([]byte, 32)
-	rand.Read(key)
-
-	// Negative lookup
-	data, err := c.Get(KIND_INFO, key)
-	if err != nil {
-		t.Fatalf("Unexpected error calling Get(): %s", err)
-	}
-	if len(data) != 0 {
-		t.Errorf("Expected Get() to return '' got '%s'", data)
-	}
-
-	// Put non-empty cacheline in
-	info := []byte("info")
-	cl := Line{Info: &info}
-
-	err = c.Put(key, cl)
-	if err != nil {
-		t.Fatalf("Unexpected error calling Put(): %s", err)
-	}
-
-	// Try again
-	data, err = c.Get(KIND_INFO, key)
-	if err != nil {
-		t.Fatalf("Unexpected error calling Has(): %s", err)
-	}
-	if !bytes.Equal(data, info) {
-		t.Errorf("Expected Get() to return %s, got %s", info, data)
-	}
-}
-
 func TestMemoryReader(t *testing.T) {
 	c := NewMemory(1e6)
 	key := make([]byte, 32)
@@ -48,7 +15,7 @@ func TestMemoryReader(t *testing.T) {
 	// Negative lookup
 	size, reader, err := c.GetReader(KIND_INFO, key)
 	if err != nil {
-		t.Fatalf("Unexpected error calling Get(): %s", err)
+		t.Fatalf("Unexpected error calling GetReader(): %s", err)
 	}
 	if size > 0 {
 		t.Errorf("Expected GetReader() to return 0, got %d", size)
@@ -84,7 +51,7 @@ func TestMemoryReader(t *testing.T) {
 		t.Fatalf("Unexpected error reading returned data: %s", err)
 	}
 	if !bytes.Equal(data, info) {
-		t.Errorf("Expected Get() to return %s, got %s", info, data)
+		t.Errorf("Expected GetReader() to return %s, got %s", info, data)
 	}
 }
 

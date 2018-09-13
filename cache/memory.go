@@ -96,27 +96,6 @@ func (c *Memory) Put(uuidAndHash []byte, data Line) error {
 	return nil
 }
 
-func (c *Memory) Get(kind Kind, uuidAndHash []byte) ([]byte, error) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	line, ok := c.data[string(uuidAndHash)]
-
-	if !ok {
-		return []byte{}, nil
-	}
-
-	if data, ok := line.data[kind]; ok {
-		// Update generation
-		c.generation++
-		line.generation = c.generation
-
-		return data, nil
-	}
-
-	return []byte{}, nil
-}
-
 func (c *Memory) GetReader(kind Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
