@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/namsral/flag"
 	"github.com/pinterest/bender"
 	"github.com/pinterest/bender/hist"
 )
@@ -73,19 +74,35 @@ func CacheValidator(request interface{}) error {
 }
 */
 
+var (
+	requestCount int
+	workerCount  int
+	verbose      bool
+)
+
+func init() {
+	flag.BoolVar(&verbose, "verbose", false, "Spew more info")
+	flag.IntVar(&requestCount, "requests", 100, "Total number of requests")
+	flag.IntVar(&workerCount, "workers", 10, "Worker number")
+}
+
 func main() {
-	requests := SyntheticCacheRequests(100)
+	flag.Parse()
+
+	requests := SyntheticCacheRequests(requestCount)
 	exec := CacheExecutor
-	recorder := make(chan interface{}, 100)
+	recorder := make(chan interface{}, requestCount)
 
 	// Set up semaphore for parallel workers
 	ws := bender.NewWorkerSemaphore()
-	go func() { ws.Signal(10) }()
+	go func() { ws.Signal(workerCount) }()
 
 	bender.LoadTestConcurrency(ws, requests, exec, recorder)
 
-	l := log.New(os.Stdout, "", log.LstdFlags)
-	//l := log.New(ioutil.Discard, "", log.LstdFlags)
+	l := log.New(ioutil.Discard, "", log.LstdFlags)
+	if verbose {
+		l = log.New(os.Stdout, "", log.LstdFlags)
+	}
 	h := hist.NewHistogram(60000, int(time.Millisecond))
 	bender.Record(recorder, bender.NewLoggingRecorder(l), bender.NewHistogramRecorder(h))
 	fmt.Println(h)
