@@ -1,6 +1,9 @@
 package cache
 
 import (
+	"bytes"
+	"io"
+	"io/ioutil"
 	"sync"
 )
 
@@ -93,23 +96,22 @@ func (c *Memory) Put(uuidAndHash []byte, data Line) error {
 	return nil
 }
 
-func (c *Memory) Get(kind Kind, uuidAndHash []byte) ([]byte, error) {
+func (c *Memory) Get(kind Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
 	line, ok := c.data[string(uuidAndHash)]
 
 	if !ok {
-		return []byte{}, nil
+		return 0, nil, nil
 	}
 
-	if bytes, ok := line.data[kind]; ok {
-		// Update generation
+	if data, ok := line.data[kind]; ok {
 		c.generation++
 		line.generation = c.generation
 
-		return bytes, nil
+		return int64(len(data)), ioutil.NopCloser(bytes.NewReader(data)), nil
 	}
 
-	return []byte{}, nil
+	return 0, nil, nil
 }

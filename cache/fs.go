@@ -2,7 +2,7 @@ package cache
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -216,17 +216,23 @@ func (fs *FS) Put(uuidAndHash []byte, data Line) error {
 	return nil
 }
 
-func (fs *FS) Get(kind Kind, uuidAndHash []byte) ([]byte, error) {
+func (fs *FS) Get(kind Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
 	path := fs.generatePath(kind, uuidAndHash)
 
 	fs.lock.RLock()
 	defer fs.lock.RUnlock()
 
 	f, err := os.Open(path)
-	if err != nil {
-		return []byte{}, nil
+	if err != nil && os.IsNotExist(err) {
+		return 0, nil, nil
+	} else if err != nil {
+		return 0, nil, err
 	}
-	defer f.Close()
 
-	return ioutil.ReadAll(f)
+	stat, err := f.Stat()
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return stat.Size(), f, nil
 }
