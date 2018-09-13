@@ -74,12 +74,15 @@ func CacheValidator(request interface{}) error {
 */
 
 func main() {
-	intervals := bender.ExponentialIntervalGenerator(10)
 	requests := SyntheticCacheRequests(100)
 	exec := CacheExecutor
 	recorder := make(chan interface{}, 100)
 
-	bender.LoadTestThroughput(intervals, requests, exec, recorder)
+	// Set up semaphore for parallel workers
+	ws := bender.NewWorkerSemaphore()
+	go func() { ws.Signal(10) }()
+
+	bender.LoadTestConcurrency(ws, requests, exec, recorder)
 
 	l := log.New(os.Stdout, "", log.LstdFlags)
 	//l := log.New(ioutil.Discard, "", log.LstdFlags)
