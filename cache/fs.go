@@ -159,7 +159,7 @@ func (fs *FS) generatePath(kind Kind, uuidAndHash []byte) string {
 		suffix = ".UNKNOWN_TYPE"
 	}
 
-	return filepath.Join(fs.Basepath, fmt.Sprintf("%02x", uuidAndHash[:1]), fmt.Sprintf("%032x.%s", uuidAndHash, suffix))
+	return filepath.Join(fs.Basepath, fmt.Sprintf("%02x", uuidAndHash[:1]), fmt.Sprintf("%016x-%016x.%s", uuidAndHash[:16], uuidAndHash[16:], suffix))
 }
 
 func (fs *FS) putKind(kind Kind, uuidAndHash, data []byte) error {
