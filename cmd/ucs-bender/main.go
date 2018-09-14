@@ -16,7 +16,12 @@ import (
 	"github.com/pinterest/bender/hist"
 )
 
-// Make every n requests (configurable percentage as PUT's?)
+// Generate synthetic cache requests.
+//
+// TODO: IRL we generally see a "hello"-request, checking there's a cache
+// server around, A new connection with tonnes of GET's for resources and then
+// another connection that slowly uploads resources as the missing ones are
+// generated. We should generate all of those
 func SyntheticCacheRequests(n int) chan interface{} {
 	c := make(chan interface{}, 100)
 
@@ -45,7 +50,7 @@ func SyntheticCacheRequests(n int) chan interface{} {
 	return c
 }
 
-// TODO: This should be generated, so we can inject our validator
+// Executes request-series against the cache server
 func CacheExecutor(unix_nsec int64, transport interface{}) (interface{}, error) {
 	// Convert transport into bytes.Buffer
 	buf, ok := transport.(*bytes.Buffer)
