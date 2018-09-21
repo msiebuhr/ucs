@@ -38,6 +38,12 @@ memo = "26b7958edde22589f5c2a9c6a568206d239b7cd9664f714475ccfeb3dceafa38"
 
 [[projects]]
   branch = "master"
+  name = "github.com/pinterest/bender"
+  packages = [".","hist"]
+  revision = "e8ff9e5c0e0f2e567eb9fe9dbf0c1c344fbd493d"
+
+[[projects]]
+  branch = "master"
   name = "github.com/prometheus/client_golang"
   packages = ["prometheus","prometheus/internal","prometheus/promhttp"]
   revision = "b5bfa0eb2c8d46bd91dc58271e973c5f0bbebcfa"
