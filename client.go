@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"gitlab.com/msiebuhr/ucs/cache"
 )
@@ -24,7 +25,7 @@ type GetRequest struct {
 	uuidAndHash []byte
 	r           io.Reader
 	w           io.WriteCloser
-	hit chan bool
+	hit         chan bool
 }
 
 func Get(K cache.Kind, uuidAndHash []byte) *GetRequest {
@@ -35,7 +36,7 @@ func Get(K cache.Kind, uuidAndHash []byte) *GetRequest {
 		uuidAndHash: uuidAndHash,
 		r:           r,
 		w:           w,
-		hit: make(chan bool, 1),
+		hit:         make(chan bool, 1),
 	}
 }
 
@@ -91,6 +92,71 @@ func (g GetRequest) ReadResponse(r io.Reader) error {
 	io.CopyN(g.w, r, int64(size))
 	g.w.Close()
 	return nil
+}
+
+// PUT Objects. A plain reader, but we need a size up-front.
+// TODO: Implement lot's of magic (file sizes, string.NewReader) etc. This
+// should eventually be put in PutRequest as internal helper functions.
+type PutObject struct {
+	r    io.Reader
+	size int
+}
+
+// PUT string wrapper
+func PutString(s string) *PutObject {
+	return &PutObject{
+		r:    strings.NewReader(s),
+		size: len([]byte(s)), // Length in bytes?
+	}
+}
+
+type PutRequest struct {
+	io.Reader
+	uuidAndHash []byte
+	info        *PutObject
+	asset       *PutObject
+	resource    *PutObject
+}
+
+func Put(uuidAndHash []byte, i *PutObject, a *PutObject, r *PutObject) *PutRequest {
+	return &PutRequest{
+		uuidAndHash: uuidAndHash,
+		info:        i,
+		asset:       a,
+		resource:    r,
+	}
+}
+
+func (p PutRequest) ReadResponse(r io.Reader) error {
+	return nil
+}
+
+func (p PutRequest) WriteRequest(w io.Writer) error {
+	_, err := fmt.Fprintf(w, "ts%s", p.uuidAndHash)
+	if err != nil {
+		return err
+	}
+
+	if p.info != nil {
+		fmt.Fprintf(w, "pi%016x", p.info.size)
+		io.Copy(w, p.info.r)
+		// TODO: Err handling
+	}
+
+	if p.asset != nil {
+		fmt.Fprintf(w, "pa%016x", p.asset.size)
+		io.Copy(w, p.asset.r)
+		// TODO: Err handling
+	}
+
+	if p.resource != nil {
+		fmt.Fprintf(w, "pr%016x", p.resource.size)
+		io.Copy(w, p.resource.r)
+		// TODO: Err handling
+	}
+
+	_, err = fmt.Fprintf(w, "te")
+	return err
 }
 
 // Generic cache client

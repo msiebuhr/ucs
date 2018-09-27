@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -54,13 +53,14 @@ func main() {
 	}()
 	c.Execute(req)
 
-	// Put something in the cache
-	rand.Read(randomGuidAndHash)
-	fmt.Fprintf(conn, "ts%s", randomGuidAndHash)
 	data := make([]byte, size)
-	fmt.Fprintf(conn, "pi%016x%s", len(data), data)
-	fmt.Fprintf(conn, "pa%016x%s", len(data), data)
-	fmt.Fprintf(conn, "te")
+	putReq := ucs.Put(
+		randomGuidAndHash,
+		ucs.PutString(string(data)), nil, nil,
+		//PutString(string(data)),
+		//PutString(string(data)),
+	)
+	c.Execute(putReq)
 
 	// Try getting it again
 	req = ucs.Get(cache.KIND_INFO, randomGuidAndHash)
