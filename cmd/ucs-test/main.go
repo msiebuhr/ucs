@@ -1,17 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"flag"
-	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
-	"strconv"
 
 	"gitlab.com/msiebuhr/ucs"
+	"gitlab.com/msiebuhr/ucs/cache"
 )
 
 var (
@@ -40,7 +37,7 @@ func main() {
 	// Send version code and read answer
 	version, err := c.NegotiateVersion(0xfe)
 	if err != nil {
-		log.Fatalf("Could not read returned version: %s", err)
+		log.Fatalf("Could not negotiate version: %v", err)
 		return
 	}
 	log.Printf("Got version %d", version)
@@ -48,75 +45,30 @@ func main() {
 	// Make a random (failing) request
 	randomGuidAndHash := make([]byte, 32)
 	rand.Read(randomGuidAndHash)
-	fmt.Fprintf(conn, "gi%s", randomGuidAndHash)
 
-	responseAndData := make([]byte, 2+32)
-	_, err = io.ReadFull(conn, responseAndData)
-	if err != nil {
-		log.Fatalf("Could not read returned data: %s", err)
-	}
-	log.Printf("Got response %s %s", responseAndData[:2], ucs.PrettyUuidAndHash(responseAndData[3:]))
+	req := ucs.Get(cache.KIND_INFO, randomGuidAndHash)
+	go func() {
+		data, err := ioutil.ReadAll(req)
+		log.Printf("Got response from client %t %d, %v", req.Hit(), len(data), err)
+	}()
+	c.Execute(req)
 
-	// Put something in the cache
-	rand.Read(randomGuidAndHash)
-	fmt.Fprintf(conn, "ts%s", randomGuidAndHash)
 	data := make([]byte, size)
-	fmt.Fprintf(conn, "pi%016x%s", len(data), data)
-	fmt.Fprintf(conn, "pa%016x%s", len(data), data)
-	fmt.Fprintf(conn, "te")
+	putReq := ucs.Put(
+		randomGuidAndHash,
+		ucs.PutString(string(data)), nil, nil,
+		//PutString(string(data)),
+		//PutString(string(data)),
+	)
+	c.Execute(putReq)
 
-	// Get data back
-	fmt.Fprintf(conn, "gi%s", randomGuidAndHash)
-	// Initial data - hit or not
-	dataType := make([]byte, 2)
-	_, err = io.ReadFull(conn, dataType)
-	if err != nil {
-		log.Fatalf("Could not read response: %s", err)
-	}
-	log.Printf("Got response %s", dataType)
-	if dataType[0] == '+' {
-		sizeBytes := make([]byte, 16)
-		_, err := io.ReadFull(conn, sizeBytes)
-		if err != nil {
-			log.Printf("Could not read response size: %s", err)
-		}
-		size, err := strconv.ParseUint(string(sizeBytes), 16, 64)
-		if err != nil {
-			log.Printf("Could not parse int: %s", err)
-		}
-		log.Printf("Got positive response size: %s/%d", sizeBytes, size)
+	// Try getting it again
+	req = ucs.Get(cache.KIND_INFO, randomGuidAndHash)
+	go func() {
+		data, err := ioutil.ReadAll(req)
+		log.Printf("Got response from client %t %d, %v", req.Hit(), len(data), err)
+	}()
+	c.Execute(req)
 
-		// Read guid + hash
-		guidAndHash := make([]byte, 32)
-		_, err = io.ReadFull(conn, guidAndHash)
-		if err != nil {
-			log.Printf("Could not read response guid+hash: %s", err)
-		}
-		log.Printf("Got positive response guid/hash: %s", ucs.PrettyUuidAndHash(guidAndHash))
-
-		response := make([]byte, size)
-		_, err = io.ReadFull(conn, response)
-		if err != nil {
-			log.Printf("Could not read data: %s", err)
-		}
-		// Check response data matches what we uploaded
-		log.Printf("Returned data matches upload? %t!", bytes.Equal(data, response))
-	} else if dataType[0] == '-' {
-		// Read guid + hash
-		guidAndHash := make([]byte, 32)
-		_, err = io.ReadFull(conn, guidAndHash)
-		if err != nil {
-			log.Printf("Could not read response guid+hash: %s", err)
-		}
-		log.Printf("Got negative response guid/hash: %s", ucs.PrettyUuidAndHash(guidAndHash))
-	}
-
-	conn.Write([]byte("q"))
-	// Read all remaining data
-	rest, err := ioutil.ReadAll(conn)
-	if err != nil {
-		log.Fatalf("Could not read remaining data: %x", err)
-	}
-	log.Printf("Got rest '%s'", rest)
-
+	c.Quit()
 }

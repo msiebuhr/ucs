@@ -1,15 +1,18 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
 	"os"
 	"time"
+
+	"gitlab.com/msiebuhr/ucs"
+	"gitlab.com/msiebuhr/ucs/cache"
 
 	"github.com/namsral/flag"
 	"github.com/pinterest/bender"
@@ -31,18 +34,32 @@ func SyntheticCacheRequests(n int) chan interface{} {
 	// Generate things to go on the wire
 	go func() {
 		for i := 0; i < n; i++ {
-			buf := bytes.NewBufferString("000000fe")
-			// TODO: Get/put requests
+			reqs := []ucs.CacheRequester{}
 
-			// Generate 100 lookups
-			for j := 0; j < 100; j++ {
-				guidAndHash[0] = byte(i + j)
-				//fmt.Fprintf(buf, "gi%s", guidAndHash);
-				buf.Write([]byte("gi"))
-				buf.Write(guidAndHash)
+			switch i % 3 {
+			case 0:
+				// No requests -- just a cache-aliveness request
+			case 1:
+				// Tonnes of GET-requests
+				for j := 0; j < 10; j++ {
+					guidAndHash[0] = byte(i + j)
+					reqs = append(
+						reqs,
+						ucs.Get(cache.KIND_INFO, guidAndHash),
+						ucs.Get(cache.KIND_ASSET, guidAndHash),
+					)
+				}
+			case 2:
+				// Put-requests
+				for j := 0; j < 10; j++ {
+					guidAndHash[0] = byte(i + j)
+					reqs = append(
+						reqs,
+						ucs.Put(guidAndHash, ucs.PutString("info"), ucs.PutString("asset"), nil),
+					)
+				}
 			}
-			buf.Write([]byte{'q'})
-			c <- buf
+			c <- reqs
 		}
 		close(c)
 	}()
@@ -52,10 +69,10 @@ func SyntheticCacheRequests(n int) chan interface{} {
 
 // Executes request-series against the cache server
 func CacheExecutor(unix_nsec int64, transport interface{}) (interface{}, error) {
-	// Convert transport into bytes.Buffer
-	buf, ok := transport.(*bytes.Buffer)
+	// Convert transport into cache requests
+	buf, ok := transport.([]ucs.CacheRequester)
 	if !ok {
-		return nil, errors.New("Transport was not a bytes.Buffer")
+		return nil, errors.New("Transport was not []CacheRequester")
 	}
 
 	// Create buffered connection
@@ -63,13 +80,36 @@ func CacheExecutor(unix_nsec int64, transport interface{}) (interface{}, error) 
 	if err != nil {
 		log.Fatalf("Could not connect: %s", err)
 	}
-	defer conn.Close()
+
+	fmt.Println("Connected", conn.LocalAddr())
+	defer fmt.Println("Done     ", conn.LocalAddr())
+
+	c := ucs.NewClient(conn)
+	c.NegotiateVersion(254)
+	defer c.Close()
 
 	// Execute requests
-	go buf.WriteTo(conn)
+	for _, req := range buf {
+		// Check if it is a PUT or GET request
+		if get, ok := req.(*ucs.GetRequest); ok {
+			//fmt.Println("  g")
+			go io.Copy(ioutil.Discard, get)
+			/*
+				go func () {
+					data, err := ioutil.ReadAll(get)
+					if err != nil { fmt.Printf("err: %s", err) }
+					fmt.Printf("  data: %db", len(data))
+				}()
+			*/
+			c.Execute(get)
+		} else {
+			//fmt.Println("  p")
+			c.Execute(req)
+		}
+	}
 
 	// Return output
-	return ioutil.ReadAll(conn)
+	return nil, nil
 }
 
 /*
