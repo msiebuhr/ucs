@@ -11,6 +11,7 @@ import (
 
 	"github.com/msiebuhr/ucs"
 	"github.com/msiebuhr/ucs/cache"
+	"github.com/msiebuhr/ucs/frontend"
 
 	"github.com/docker/go-units"
 	"github.com/namsral/flag"
@@ -100,6 +101,7 @@ func main() {
 	// Set up web-server mux
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/", http.FileServer(frontend.FS(false)))
 
 	// Create the web-server itself
 	h := &http.Server{Addr: HTTPAddress, Handler: mux}
