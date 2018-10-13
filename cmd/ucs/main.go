@@ -104,7 +104,7 @@ func main() {
 		}
 	}()
 
-	go server.Listen(context.Background(), "tcp", address)
+	go server.Listen(context.Background(), address)
 
 	// Handle SIGINT and SIGTERM.
 	ch := make(chan os.Signal)

@@ -81,7 +81,7 @@ func NewServer(options ...func(*Server)) *Server {
 	return s
 }
 
-func (s *Server) Listen(ctx context.Context, network, address string) error {
+func (s *Server) Listen(ctx context.Context, address string) error {
 	laddr, err := net.ResolveTCPAddr("tcp", address)
 	if nil != err {
 		s.log(ctx, "Error resolving address:", err.Error())
