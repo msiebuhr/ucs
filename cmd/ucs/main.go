@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"gitlab.com/msiebuhr/ucs"
 	"gitlab.com/msiebuhr/ucs/cache"
@@ -102,5 +104,13 @@ func main() {
 		}
 	}()
 
-	server.Listen(context.Background(), "tcp", address)
+	go server.Listen(context.Background(), "tcp", address)
+
+	// Handle SIGINT and SIGTERM.
+	ch := make(chan os.Signal)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+	log.Println(<-ch)
+
+	// Stop the service gracefully.
+	server.Stop()
 }
