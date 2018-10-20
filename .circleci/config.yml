@@ -29,6 +29,13 @@ jobs:
             go test -v -race $(go list ./... | grep -v /vendor/) | tee ${TEST_RESULTS}/go-test.out
 
       - run:
+          name: Binaries
+          command: |
+              go build -race -ldflags "-extldflags '-static'" -o /tmp/ucs ./cmd/ucs/
+              go build -race -ldflags "-extldflags '-static'" -o /tmp/ucs-test ./cmd/ucs-test/
+              go build -race -ldflags "-extldflags '-static'" -o /tmp/ucs-bender ./cmd/ucs-bender/
+
+      - run:
           name: Bench
           command: go test -bench=. -run=NONE ./... > $TEST_RESULTS/benchmark.txt
 
