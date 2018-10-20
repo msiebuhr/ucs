@@ -26,5 +26,18 @@ jobs:
           name: Unit tests
           command: go test -v -race $(go list ./... | grep -v /vendor/) 2>&1 | go-junit-report > $TEST_RESULTS/report.xml
 
+      - run:
+          name: Bench
+          command: go test -bench=. -run=NONE ./... > $TEST_RESULTS/benchmark.txt
+
+      - run:
+          name: Bench-mem
+          command: go test -bench=. -run=NONE -benchmem ./... > $TEST_RESULTS/benchmark-mem.txt
+
+      - store_artifacts:
+          path: /tmp/test-results
+          destination: raw-test-output
+
+
       - store_test_results:
           path: /tmp/test-results
