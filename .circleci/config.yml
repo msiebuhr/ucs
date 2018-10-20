@@ -37,11 +37,11 @@ jobs:
 
       - run:
           name: Bench
-          command: go test -bench=. -run=NONE ./... > $TEST_RESULTS/benchmark.txt
+          command: go test -bench=. -run=NONE ./... | tee $TEST_RESULTS/benchmark.txt
 
       - run:
           name: Bench-mem
-          command: go test -bench=. -run=NONE -benchmem ./... > $TEST_RESULTS/benchmark-mem.txt
+          command: go test -bench=. -run=NONE -benchmem ./... | tee $TEST_RESULTS/benchmark-mem.txt
 
       - store_artifacts:
           path: /tmp/test-results
