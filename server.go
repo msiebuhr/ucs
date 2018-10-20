@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"gitlab.com/msiebuhr/ucs/cache"
@@ -59,13 +60,18 @@ func PrettyUuidAndHash(d []byte) string {
 type Server struct {
 	Cache cache.Cacher
 	Log   *log.Logger
+
+	closer    chan bool
+	waitGroup *sync.WaitGroup
 }
 
 // Set up a new server
 func NewServer(options ...func(*Server)) *Server {
 	s := &Server{
-		Cache: cache.NewNOP(),
-		Log:   log.New(ioutil.Discard, "", 0),
+		Cache:     cache.NewNOP(),
+		Log:       log.New(ioutil.Discard, "", 0),
+		closer:    make(chan bool, 1),
+		waitGroup: &sync.WaitGroup{},
 	}
 
 	for _, f := range options {
@@ -75,8 +81,13 @@ func NewServer(options ...func(*Server)) *Server {
 	return s
 }
 
-func (s *Server) Listen(ctx context.Context, network, address string) error {
-	listener, err := net.Listen(network, address)
+func (s *Server) Listen(ctx context.Context, address string) error {
+	laddr, err := net.ResolveTCPAddr("tcp", address)
+	if nil != err {
+		s.log(ctx, "Error resolving address:", err.Error())
+		return err
+	}
+	listener, err := net.ListenTCP("tcp", laddr)
 	if err != nil {
 		s.log(ctx, "Error listening:", err.Error())
 		return err
@@ -87,18 +98,33 @@ func (s *Server) Listen(ctx context.Context, network, address string) error {
 	return s.Listener(ctx, listener)
 }
 
-func (s *Server) Listener(ctx context.Context, listener net.Listener) error {
+func (s *Server) Listener(ctx context.Context, listener *net.TCPListener) error {
 	for {
-		// Listen for an incoming connection.
-		conn, err := listener.Accept()
-		if err != nil {
-			s.log(ctx, "Error accepting: ", err.Error())
-			continue
+		select {
+		case <-s.closer:
+			s.log(ctx, "Stopping listening")
+			listener.Close()
+			return nil
+		default:
 		}
-		// Handle connections in a new goroutine.
+		listener.SetDeadline(time.Now().Add(1 * time.Second))
+		conn, err := listener.AcceptTCP()
+		if nil != err {
+			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
+				continue
+			}
+			s.log(ctx, "Error accepting: ", err.Error())
+		}
+		log.Println(conn.RemoteAddr(), "connected")
+		//s.waitGroup.Add(1)
 		connCtx := context.WithValue(ctx, "addr", conn.RemoteAddr().String())
 		go s.handleRequest(connCtx, conn)
 	}
+}
+
+func (s *Server) Stop() {
+	close(s.closer)
+	s.waitGroup.Wait()
 }
 
 func (s *Server) log(ctx context.Context, rest ...interface{}) {
@@ -151,10 +177,12 @@ func readVersionNumber(rw *bufio.ReadWriter) (uint32, error) {
 
 // Handles incoming requests.
 func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
+	s.waitGroup.Add(1)
 	start := time.Now()
 	defer func() {
 		s.log(ctx, "Closing connection")
 		conn.Close()
+		s.waitGroup.Done()
 	}()
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 	defer rw.Flush()

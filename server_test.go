@@ -18,6 +18,7 @@ func TestHandshakes(t *testing.T) {
 	// Send the regular hex string '00fe'
 	client, server := net.Pipe()
 	s := NewServer()
+	defer s.Stop()
 	go s.handleRequest(context.Background(), server)
 
 	go func() {
@@ -37,6 +38,7 @@ func TestHandshakes(t *testing.T) {
 func TestInvalidVersionHandshake(t *testing.T) {
 	client, server := net.Pipe()
 	s := NewServer()
+	defer s.Stop()
 	go s.handleRequest(context.Background(), server)
 
 	go func() {
@@ -55,6 +57,7 @@ func TestInvalidVersionHandshake(t *testing.T) {
 func TestShortVersionHandshake(t *testing.T) {
 	client, server := net.Pipe()
 	s := NewServer()
+	defer s.Stop()
 	go s.handleRequest(context.Background(), server)
 
 	go func() {
@@ -92,6 +95,7 @@ func TestGACacheMiss(t *testing.T) {
 func TestGACachePutAndGet(t *testing.T) {
 	client, server := net.Pipe()
 	s := NewServer(func(s *Server) { s.Cache = cache.NewMemory(1e6) })
+	defer s.Stop()
 	go s.handleRequest(context.Background(), server)
 
 	data := []byte("Here is some very lovely test information for ya'")
@@ -119,6 +123,7 @@ func TestGACachePutAndGet(t *testing.T) {
 func TestCacheMultiPutAndGet(t *testing.T) {
 	client, server := net.Pipe()
 	s := NewServer(func(s *Server) { s.Cache = cache.NewMemory(1e6) })
+	defer s.Stop()
 	go s.handleRequest(context.Background(), server)
 
 	data := []byte("Here is some very lovely test information for ya'")
@@ -149,6 +154,7 @@ func TestCacheMultiPutAndGet(t *testing.T) {
 func TestWrongCmdType(t *testing.T) {
 	client, server := net.Pipe()
 	s := NewServer()
+	defer s.Stop()
 	go s.handleRequest(context.Background(), server)
 
 	go func() {
@@ -175,6 +181,7 @@ func TestGACachePutAndGetKeyWithUTF8(t *testing.T) {
 		s.Cache = cache.NewMemory(1e7)
 		//s.Log = log.New(os.Stdout, "server: ", 0)
 	})
+	defer s.Stop()
 	go s.handleRequest(context.Background(), server)
 
 	uuidAndHash := make([]byte, 32)
@@ -213,6 +220,7 @@ func BenchmarkMemory1mb(b *testing.B) {
 	s := NewServer(
 	//func (l *Server) {l.Log = log.New(os.Stdout, "", 0)}
 	)
+	defer s.Stop()
 
 	HelpBenchmarkServerGets(b, s, 1024*1024)
 }

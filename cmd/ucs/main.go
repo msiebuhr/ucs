@@ -5,6 +5,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"gitlab.com/msiebuhr/ucs"
 	"gitlab.com/msiebuhr/ucs/cache"
@@ -94,13 +97,32 @@ func main() {
 		},
 	)
 
-	// Expose metrics through an HTTP server
-	http.Handle("/metrics", promhttp.Handler())
+	// Set up web-server mux
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	// Create the web-server itself
+	h := &http.Server{Addr: HTTPAddress, Handler: mux}
+
+	// Start it
 	go func() {
-		if err := http.ListenAndServe(HTTPAddress, nil); err != nil {
+		if err := h.ListenAndServe(); err != nil {
 			log.Println("ListenAndServe: ", err)
 		}
 	}()
 
-	server.Listen(context.Background(), "tcp", address)
+	go server.Listen(context.Background(), address)
+
+	// Handle SIGINT and SIGTERM.
+	ch := make(chan os.Signal)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+	log.Println(<-ch)
+
+	// Stop web interface gracefully
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	h.Shutdown(ctx)
+
+	// Stop the service gracefully.
+	server.Stop()
 }
