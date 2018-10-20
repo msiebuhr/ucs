@@ -11,7 +11,7 @@ import (
 	"os"
 	"testing"
 
-	"gitlab.com/msiebuhr/ucs/cache"
+	"github.com/msiebuhr/ucs/cache"
 )
 
 func TestHandshakes(t *testing.T) {

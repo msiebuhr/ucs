@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"gitlab.com/msiebuhr/ucs"
-	"gitlab.com/msiebuhr/ucs/cache"
+	"github.com/msiebuhr/ucs"
+	"github.com/msiebuhr/ucs/cache"
 
 	"github.com/docker/go-units"
 	"github.com/namsral/flag"

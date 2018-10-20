@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/msiebuhr/ucs/cache"
+	"github.com/msiebuhr/ucs/cache"
 
 	"github.com/prometheus/client_golang/prometheus"
 )

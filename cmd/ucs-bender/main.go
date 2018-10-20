@@ -11,8 +11,8 @@ import (
 	"os"
 	"time"
 
-	"gitlab.com/msiebuhr/ucs"
-	"gitlab.com/msiebuhr/ucs/cache"
+	"github.com/msiebuhr/ucs"
+	"github.com/msiebuhr/ucs/cache"
 
 	"github.com/namsral/flag"
 	"github.com/pinterest/bender"

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gitlab.com/msiebuhr/ucs/cache"
+	"github.com/msiebuhr/ucs/cache"
 )
 
 // Cache requester is for talking to the cache
