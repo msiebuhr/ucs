@@ -24,7 +24,9 @@ jobs:
       - run: go get -u github.com/jstemmer/go-junit-report
       - run:
           name: Unit tests
-          command: go test -v -race $(go list ./... | grep -v /vendor/) 2>&1 | go-junit-report > $TEST_RESULTS/report.xml
+          command: |
+            trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/go-test-report.xml" EXIT
+            go test -v -race $(go list ./... | grep -v /vendor/) | tee ${TEST_RESULTS}/go-test.out
 
       - run:
           name: Bench
