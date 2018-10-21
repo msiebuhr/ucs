@@ -3,12 +3,24 @@ Unity Cache Server
 
 .. in Go
 
-Related docs
-------------
+Installation from source
+========================
 
- * [Node.js source code](https://github.com/Unity-Technologies/unity-cache-server)
+    go install github.com/msiebuhr/ucs/cmd/ucs
+    ucs -h
+
+There's also a quick-and-dirty loadtest utility, `ucs-bender`:
+
+    go install github.com/msiebuhr/ucs/cmd/ucs-bender
+    ucs-bender
+
+
+Related
+-------
+
+ * The "official" [Node.js cache server](https://github.com/Unity-Technologies/unity-cache-server)
  * [Blog about 6.0 development](https://blogs.unity3d.com/2018/03/20/cache-server-6-0-release-and-retrospective-optimizing-import/)
- * [C# Implementation](https://github.com/Avatarchik/UnityCachePlusPlus)
+ * [Unofficial C# Implementation](https://github.com/Avatarchik/UnityCachePlusPlus)
 
 Miscellaneous
 -------------
