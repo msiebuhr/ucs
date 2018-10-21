@@ -21,17 +21,17 @@ import (
 
 // Generate synthetic cache requests.
 //
-// TODO: IRL we generally see a "hello"-request, checking there's a cache
-// server around, A new connection with tonnes of GET's for resources and then
-// another connection that slowly uploads resources as the missing ones are
-// generated. We should generate all of those
+// Traces from Unity shows connections generally come in triplets; One at
+// startup, which immediately quits (presumably to check cache server
+// availability). Then when Unity has figured out what assets it needs, another
+// connection is opened up, which requests all the assets. Finally, if any
+// assets were missing, a connection to upload these after they've been built locally.
 func SyntheticCacheRequests(n int) chan interface{} {
 	c := make(chan interface{}, 100)
 
 	guidAndHash := make([]byte, 32)
 	rand.Read(guidAndHash)
 
-	// Generate things to go on the wire
 	go func() {
 		for i := 0; i < n; i++ {
 			reqs := []ucs.CacheRequester{}
@@ -78,21 +78,21 @@ func CacheExecutor(unix_nsec int64, transport interface{}) (interface{}, error) 
 	// Create buffered connection
 	conn, err := net.Dial("tcp", ":8126")
 	if err != nil {
-		log.Fatalf("Could not connect: %s", err)
+		return nil, err
+		//log.Fatalf("Could not connect: %s", err)
 	}
 
-	fmt.Println("Connected", conn.LocalAddr())
-	defer fmt.Println("Done     ", conn.LocalAddr())
-
 	c := ucs.NewClient(conn)
-	c.NegotiateVersion(254)
+	_, err = c.NegotiateVersion(254)
+	if err != nil {
+		return nil, err
+	}
 	defer c.Close()
 
 	// Execute requests
 	for _, req := range buf {
 		// Check if it is a PUT or GET request
 		if get, ok := req.(*ucs.GetRequest); ok {
-			//fmt.Println("  g")
 			go io.Copy(ioutil.Discard, get)
 			/*
 				go func () {
@@ -101,10 +101,12 @@ func CacheExecutor(unix_nsec int64, transport interface{}) (interface{}, error) 
 					fmt.Printf("  data: %db", len(data))
 				}()
 			*/
-			c.Execute(get)
+			err = c.Execute(get)
 		} else {
-			//fmt.Println("  p")
-			c.Execute(req)
+			err = c.Execute(req)
+		}
+		if (err != nil) {
+			return nil, err
 		}
 	}
 
