@@ -26,3 +26,4 @@ Miscellaneous
 -------------
 
  * Icon by [Elizabeth Arostegui ](https://www.iconfinder.com/icons/998676/challenge_game_puzzle_rubik_icon)
+ * MIT-Licensed
