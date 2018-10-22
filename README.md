@@ -6,7 +6,7 @@ Unity Cache Server
 Installation from source
 ========================
 
-    go install github.com/msiebuhr/ucs/cmd/ucs
+    go get -u github.com/msiebuhr/ucs/cmd/ucs
     ucs
 
 This will listen for cache-requests on TCP port 8126 and start a small
@@ -22,7 +22,7 @@ environment variables, making the following examples equivalent:
 
 There's also a quick-and-dirty loadtest utility, `ucs-bender`:
 
-    go install github.com/msiebuhr/ucs/cmd/ucs-bender
+    go get -u github.com/msiebuhr/ucs/cmd/ucs-bender
     ucs-bender
 
 
