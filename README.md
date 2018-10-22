@@ -4,7 +4,7 @@ Unity Cache Server
 .. in Go
 
 Installation from source
-========================
+------------------------
 
     go get -u github.com/msiebuhr/ucs/cmd/ucs
     ucs
@@ -20,10 +20,13 @@ environment variables, making the following examples equivalent:
     ucs --quota 10GB
     QUOTA=10GB ucs
 
+Load testing
+------------
+
 There's also a quick-and-dirty loadtest utility, `ucs-bender`:
 
     go get -u github.com/msiebuhr/ucs/cmd/ucs-bender
-    ucs-bender
+    ucs-bender # Will run against localhost
 
 
 Related
