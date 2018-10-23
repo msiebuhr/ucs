@@ -58,8 +58,9 @@ func PrettyUuidAndHash(d []byte) string {
 }
 
 type Server struct {
-	Cache cache.Cacher
-	Log   *log.Logger
+	Cache     cache.Cacher
+	Log       *log.Logger
+	Namespace string
 
 	closer    chan bool
 	waitGroup *sync.WaitGroup
@@ -70,6 +71,7 @@ func NewServer(options ...func(*Server)) *Server {
 	s := &Server{
 		Cache:     cache.NewNOP(),
 		Log:       log.New(ioutil.Discard, "", 0),
+		Namespace: "",
 		closer:    make(chan bool, 1),
 		waitGroup: &sync.WaitGroup{},
 	}
@@ -99,6 +101,11 @@ func (s *Server) Listen(ctx context.Context, address string) error {
 }
 
 func (s *Server) Listener(ctx context.Context, listener *net.TCPListener) error {
+	// Enrich context with current namespace
+	if s.Namespace != "" {
+		ctx = context.WithValue(ctx, "namespace", s.Namespace)
+	}
+
 	for {
 		select {
 		case <-s.closer:
@@ -262,7 +269,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			s.logf(ctx, "Get '%c' '%s'", cmdType, PrettyUuidAndHash(uuidAndHash))
 
-			size, reader, err := s.Cache.Get(cache.Kind(cmdType), uuidAndHash)
+			size, reader, err := s.Cache.Get(s.Namespace, cache.Kind(cmdType), uuidAndHash)
 			if err != nil {
 				getCacheHit.WithLabelValues(string(cmdType), "miss").Inc()
 				s.log(ctx, "Error reading from cache:", err)
@@ -321,7 +328,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 				return
 			}
 
-			err := s.Cache.Put(trx, trxData)
+			err := s.Cache.Put(s.Namespace, trx, trxData)
 			if err != nil {
 				s.log(ctx, "Error ending trx - cache put error:", err)
 				continue

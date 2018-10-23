@@ -95,6 +95,7 @@ func main() {
 				s.Log = log.New(os.Stdout, "server: ", 0)
 			}
 		},
+		func(s *ucs.Server) { s.Namespace = "default" },
 	)
 
 	// Set up web-server mux

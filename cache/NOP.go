@@ -11,12 +11,12 @@ func NewNOP() *NOP {
 }
 
 // Discards all given data
-func (n *NOP) Put(uuidAndHash []byte, data Line) error {
+func (n *NOP) Put(ns string, uuidAndHash []byte, data Line) error {
 	return nil
 }
 
 // Return emoty readers
-func (n *NOP) Get(k Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
+func (n *NOP) Get(ns string, k Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
 	return 0, nil, nil
 	//return false, ioutil.NopCloser(strings.NewReader("")), nil)
 }
