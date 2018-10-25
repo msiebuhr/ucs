@@ -105,7 +105,7 @@ func CacheExecutor(unix_nsec int64, transport interface{}) (interface{}, error) 
 		} else {
 			err = c.Execute(req)
 		}
-		if (err != nil) {
+		if err != nil {
 			return nil, err
 		}
 	}
