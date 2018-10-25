@@ -119,7 +119,7 @@ func (s *Server) Listener(ctx context.Context, listener *net.TCPListener) error 
 			s.log(ctx, "Error accepting: ", err.Error())
 			continue
 		}
-		log.Println(conn.RemoteAddr(), "connected")
+		s.log(ctx, "connected")
 		//s.waitGroup.Add(1)
 		connCtx := context.WithValue(ctx, "addr", conn.RemoteAddr().String())
 		go s.handleRequest(connCtx, conn)
