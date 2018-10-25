@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -90,12 +91,7 @@ func (fs *FS) collectGarbage() {
 		return
 	}
 
-	var old = make([]struct {
-		ns          string
-		uuidAndHash string
-		size        int64
-		time        time.Time
-	}, 256*len(entries))
+	old := make(fsCacheEntries, 256*len(entries))
 
 	sizes := make([]int64, len(entries))
 	allDone := sync.WaitGroup{}
@@ -152,6 +148,7 @@ func (fs *FS) collectGarbage() {
 		fs.Size += size
 	}
 
+	sort.Sort(old)
 
 	// Ideally, we should delete the very oldest stuff first (and both info and
 	// asset/resource), and then re-scan that directory.
