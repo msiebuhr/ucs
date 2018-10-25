@@ -112,6 +112,7 @@ func (fs *FS) collectGarbage() {
 				old[i].time = t
 			}
 		}
+		dir.Close()
 	}
 
 	// Ideally, we should delete the very oldest stuff first (and both info and
