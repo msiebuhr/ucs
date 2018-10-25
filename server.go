@@ -110,10 +110,14 @@ func (s *Server) Listener(ctx context.Context, listener *net.TCPListener) error 
 		listener.SetDeadline(time.Now().Add(1 * time.Second))
 		conn, err := listener.AcceptTCP()
 		if nil != err {
+			// Ignore timeout errors -- we have those so we'll also take a peek at the closer-channel.
 			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
 				continue
 			}
+
+			// Genuine error - log and try again
 			s.log(ctx, "Error accepting: ", err.Error())
+			continue
 		}
 		log.Println(conn.RemoteAddr(), "connected")
 		//s.waitGroup.Add(1)
