@@ -5,7 +5,26 @@ import (
 	"io"
 	"io/ioutil"
 	"sync"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+var (
+	memory_gc_duration = prometheus.NewSummary(prometheus.SummaryOpts{
+		Name: "ucs_memorycache_gc_duration_seconds",
+		Help: "Time spent deleting data",
+	})
+	memory_gc_bytes = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ucs_memorycache_gc_removed_bytes",
+		Help: "Bytes deleted by GC",
+	})
+)
+
+func init() {
+	prometheus.MustRegister(memory_gc_duration)
+	prometheus.MustRegister(memory_gc_bytes)
+}
 
 type memoryEntry struct {
 	data       map[Kind][]byte
@@ -58,9 +77,11 @@ func NewMemory(quota int64) *Memory {
 }
 
 func (m *Memory) collectGarbage(spaceToMake int64) {
+	start := time.Now()
 	//m.lock.Lock()
 	//defer m.lock.Unlock()
 
+	defer memory_gc_duration.Observe(time.Now().Sub(start).Seconds())
 	// TODO: Make sure we don't get stuck in infinite loops
 
 	// Walk all keys and delete the oldest data until we have room...
@@ -77,6 +98,7 @@ func (m *Memory) collectGarbage(spaceToMake int64) {
 
 		// Decrement size and remove key
 		m.size -= m.data[oldestKey].size
+		memory_gc_bytes.Add(float64(m.data[oldestKey].size))
 		delete(m.data, oldestKey)
 	}
 }
