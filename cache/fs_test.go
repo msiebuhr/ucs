@@ -20,7 +20,7 @@ func TestFSGeneratePath(t *testing.T) {
 	path := fs.generatePath("", KIND_INFO, key)
 
 	// Ends with <key>.info
-	suffix := "/cache5.0/__default/00/000102030405060708090a0b0c0d0e0f-101112131415161718191a1b1c1d1e1f.info"
+	suffix := "/unity-cache/__default/00/000102030405060708090a0b0c0d0e0f-101112131415161718191a1b1c1d1e1f.info"
 	if path[len(path)-len(suffix):] != suffix {
 		t.Errorf("Unexpected suffix\n\t%s\nexpected\n\t%s", suffix, path)
 	}
@@ -34,7 +34,7 @@ func TestFSGeneratePath(t *testing.T) {
 	path = fs.generatePath("NameSpace", KIND_INFO, key)
 
 	// Ends with <key>.info
-	suffix = "/cache5.0/NameSpace/00/000102030405060708090a0b0c0d0e0f-101112131415161718191a1b1c1d1e1f.info"
+	suffix = "/unity-cache/NameSpace/00/000102030405060708090a0b0c0d0e0f-101112131415161718191a1b1c1d1e1f.info"
 	if path[len(path)-len(suffix):] != suffix {
 		t.Errorf("Unexpected suffix\n\t%s\nexpected\n\t%s", suffix, path)
 	}
