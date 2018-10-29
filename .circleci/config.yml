@@ -35,12 +35,12 @@ jobs:
               go build -race -ldflags "-extldflags '-static'" -o /tmp/ucs-test ./cmd/ucs-test/
               go build -race -ldflags "-extldflags '-static'" -o /tmp/ucs-bender ./cmd/ucs-bender/
 
-      - run:
-          name: Generate
-          command: |
-              go get -u github.com/mjibson/esc
-              go generate ./...
-              git diff --exit-code ./frontend/
+      #- run:
+      #    name: Generate
+      #    command: |
+      #        go get -u github.com/mjibson/esc
+      #        go generate ./...
+      #        git diff --exit-code ./frontend/
 
       - run:
           name: Bench
