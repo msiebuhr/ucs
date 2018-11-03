@@ -21,27 +21,27 @@ var (
 	ops = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "ucs_server_ops",
 		Help: "Operations performed on the server",
-	}, []string{"op"})
+	}, []string{"namespace", "op"})
 	getCacheHit = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "ucs_server_get_hits",
 		Help: "Hit/miss upon get'ing from the cache",
-	}, []string{"type", "hit"})
+	}, []string{"namespace", "type", "hit"})
 	getBytes = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Name: "ucs_server_get_bytes",
 		Help: "Bytes fetched fom server",
-	}, []string{"type"})
+	}, []string{"namespace", "type"})
 	putBytes = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Name: "ucs_server_put_bytes",
 		Help: "Bytes sent fom server",
-	}, []string{"type"})
+	}, []string{"namespace", "type"})
 	getDurations = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Name: "ucs_server_get_duration_seconds",
 		Help: "Time spent sending data",
-	}, []string{"type"})
+	}, []string{"namespace", "type"})
 	putDurations = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Name: "ucs_server_put_duration_seconds",
 		Help: "Time spent recieving data",
-	}, []string{"type"})
+	}, []string{"namespace", "type"})
 )
 
 func init() {
@@ -58,8 +58,9 @@ func PrettyUuidAndHash(d []byte) string {
 }
 
 type Server struct {
-	Cache cache.Cacher
-	Log   *log.Logger
+	Cache     cache.Cacher
+	Log       *log.Logger
+	Namespace string
 
 	closer    chan bool
 	waitGroup *sync.WaitGroup
@@ -70,6 +71,7 @@ func NewServer(options ...func(*Server)) *Server {
 	s := &Server{
 		Cache:     cache.NewNOP(),
 		Log:       log.New(ioutil.Discard, "", 0),
+		Namespace: "",
 		closer:    make(chan bool, 1),
 		waitGroup: &sync.WaitGroup{},
 	}
@@ -99,6 +101,11 @@ func (s *Server) Listen(ctx context.Context, address string) error {
 }
 
 func (s *Server) Listener(ctx context.Context, listener *net.TCPListener) error {
+	// Enrich context with current namespace
+	if s.Namespace != "" {
+		ctx = context.WithValue(ctx, "namespace", s.Namespace)
+	}
+
 	for {
 		select {
 		case <-s.closer:
@@ -237,7 +244,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 		// Quit command
 		if cmd == 'q' {
-			ops.WithLabelValues("q").Inc()
+			ops.WithLabelValues(s.Namespace, "q").Inc()
 			s.logf(ctx, "Got command '%c'; Quitting", cmd)
 			return
 		}
@@ -254,7 +261,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 		// GET
 		if cmd == 'g' {
-			ops.WithLabelValues("g").Inc()
+			ops.WithLabelValues(s.Namespace, "g").Inc()
 
 			// Read uuidAndHash
 			uuidAndHash := make([]byte, 32)
@@ -262,15 +269,15 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			s.logf(ctx, "Get '%c' '%s'", cmdType, PrettyUuidAndHash(uuidAndHash))
 
-			size, reader, err := s.Cache.Get(cache.Kind(cmdType), uuidAndHash)
+			size, reader, err := s.Cache.Get(s.Namespace, cache.Kind(cmdType), uuidAndHash)
 			if err != nil {
-				getCacheHit.WithLabelValues(string(cmdType), "miss").Inc()
+				getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "miss").Inc()
 				s.log(ctx, "Error reading from cache:", err)
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
 				continue
 			}
 			if size == 0 {
-				getCacheHit.WithLabelValues(string(cmdType), "miss").Inc()
+				getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "miss").Inc()
 				s.log(ctx, "Cache miss")
 				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
 				if reader != nil {
@@ -282,15 +289,15 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			fmt.Fprintf(rw, "+%c%016x%s", cmdType, size, uuidAndHash)
 			io.Copy(rw, reader)
 			reader.Close()
-			getCacheHit.WithLabelValues(string(cmdType), "hit").Inc()
-			getBytes.WithLabelValues(string(cmdType)).Observe(float64(size))
-			getDurations.WithLabelValues(string(cmdType)).Observe(time.Now().Sub(start).Seconds())
+			getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "hit").Inc()
+			getBytes.WithLabelValues(s.Namespace, string(cmdType)).Observe(float64(size))
+			getDurations.WithLabelValues(s.Namespace, string(cmdType)).Observe(time.Now().Sub(start).Seconds())
 			continue
 		}
 
 		// Transaction start
 		if cmd == 't' && cmdType == 's' {
-			ops.WithLabelValues("ts").Inc()
+			ops.WithLabelValues(s.Namespace, "ts").Inc()
 
 			// Bail if we're already in a command
 			if len(trx) > 0 {
@@ -314,14 +321,14 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 		// Transaction end
 		if cmd == 't' && cmdType == 'e' {
-			ops.WithLabelValues("te").Inc()
+			ops.WithLabelValues(s.Namespace, "te").Inc()
 
 			if len(trx) == 0 {
 				s.log(ctx, "Error ending trx - none started")
 				return
 			}
 
-			err := s.Cache.Put(trx, trxData)
+			err := s.Cache.Put(s.Namespace, trx, trxData)
 			if err != nil {
 				s.log(ctx, "Error ending trx - cache put error:", err)
 				continue
@@ -334,7 +341,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 		// Put
 		if cmd == 'p' {
-			ops.WithLabelValues("p").Inc()
+			ops.WithLabelValues(s.Namespace, "p").Inc()
 
 			// Bail on wrong CMD-types
 			if cmdType != 'a' && cmdType != 'i' && cmdType != 'r' {
@@ -361,13 +368,13 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			// TODO: Cache should probably have the reader embedded
 			trxData.PutReader(cache.Kind(cmdType), size, rw)
 
-			putBytes.WithLabelValues(string(cmdType)).Observe(float64(size))
-			putDurations.WithLabelValues(string(cmdType)).Observe(time.Now().Sub(start).Seconds())
+			putBytes.WithLabelValues(s.Namespace, string(cmdType)).Observe(float64(size))
+			putDurations.WithLabelValues(s.Namespace, string(cmdType)).Observe(time.Now().Sub(start).Seconds())
 			continue
 		}
 
 		// Invalid command
-		ops.WithLabelValues("invalid").Inc()
+		ops.WithLabelValues(s.Namespace, "invalid").Inc()
 		s.logf(ctx, "Invalid command: %c%c", cmd, cmdType)
 		return
 	}

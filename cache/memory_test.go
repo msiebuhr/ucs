@@ -13,7 +13,7 @@ func TestMemoryReader(t *testing.T) {
 	rand.Read(key)
 
 	// Negative lookup
-	size, reader, err := c.Get(KIND_INFO, key)
+	size, reader, err := c.Get("mem", KIND_INFO, key)
 	if err != nil {
 		t.Fatalf("Unexpected error calling Get(): %s", err)
 	}
@@ -28,13 +28,13 @@ func TestMemoryReader(t *testing.T) {
 	info := []byte("info")
 	cl := Line{Info: &info}
 
-	err = c.Put(key, cl)
+	err = c.Put("mem", key, cl)
 	if err != nil {
 		t.Fatalf("Unexpected error calling Put(): %s", err)
 	}
 
 	// Try again
-	size, reader, err = c.Get(KIND_INFO, key)
+	size, reader, err = c.Get("mem", KIND_INFO, key)
 	if err != nil {
 		t.Fatalf("Unexpected error calling Get(): %s", err)
 	}
@@ -65,7 +65,7 @@ func TestMemoryquota(t *testing.T) {
 		rand.Read(keys[i])
 
 		cl := Line{Info: &[]byte{byte(i)}}
-		err := c.Put(keys[i], cl)
+		err := c.Put("mem", keys[i], cl)
 		if err != nil {
 			t.Fatalf("Unexpected error calling Put(): %s", err)
 		}
@@ -78,7 +78,7 @@ func TestMemoryquota(t *testing.T) {
 	// Put something large and check it is bumps everything else off
 	data := make([]byte, 100)
 	cl := Line{Info: &data}
-	c.Put(make([]byte, 32), cl)
+	c.Put("mem", make([]byte, 32), cl)
 
 	if len(c.data) != 1 {
 		t.Errorf("Expected cache length to be 1, has %d", len(c.data))

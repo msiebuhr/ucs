@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,67 +12,39 @@ import (
 
 	"github.com/msiebuhr/ucs"
 	"github.com/msiebuhr/ucs/cache"
+	"github.com/msiebuhr/ucs/customflags"
 	"github.com/msiebuhr/ucs/frontend"
 
-	"github.com/docker/go-units"
 	"github.com/namsral/flag"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// Quick-and-dirty human-readable sizes
-type Size struct {
-	size *int64
-}
-
-func (v Size) String() string {
-	if v.size == nil {
-		return ""
-	}
-	return units.HumanSize(float64(*v.size))
-}
-
-func (v Size) Int64() int64 {
-	if v.size == nil {
-		return 0
-	}
-	return *v.size
-}
-
-func (v Size) Set(s string) error {
-	b, err := units.FromHumanSize(s)
-	if err != nil {
-		return err
-	}
-	*v.size = b
-	return nil
-}
-
-func NewSize(s int64) *Size {
-	size := Size{}
-	size.size = &s
-	return &size
-}
-
 var (
 	cacheBackend string
-	address      string
 	HTTPAddress  string
-	quota        = NewSize(1e9)
+	quota        = customflags.NewSize(1024*1024*1024)
 	verbose      bool
+	ports        = &customflags.Namespaces{}
 )
 
 func init() {
 	flag.StringVar(&cacheBackend, "cache-backend", "fs", "Cache backend (fs or memory)")
-	flag.StringVar(&address, "address", ":8126", "Address and port to listen on")
 	flag.StringVar(&HTTPAddress, "http-address", ":9126", "Address and port for HTTP metrics/admin interface")
 	flag.BoolVar(&verbose, "verbose", false, "Spew more info")
 	flag.Var(quota, "quota", "Storage quota (ex. 10GB, 1TB, ...)")
+	flag.Var(ports, "port", "Namespaces/ports to open (ex: zombie-zebras:5000) May be used multiple times")
 }
 
 func main() {
 	flag.Parse()
 
+	// Set a defalt port if the user doesn't set anything
+	if len(*ports) == 0 {
+		ports.Set("default:8126")
+	}
+
 	log.Println("Starting. Quota ", quota)
+	log.Println("Starting. Ports ", ports)
 
 	// Figure out a cache
 	var c cache.Cacher
@@ -89,14 +62,21 @@ func main() {
 		panic("Unknown backend " + cacheBackend)
 	}
 
-	server := ucs.NewServer(
-		func(s *ucs.Server) { s.Cache = c },
-		func(s *ucs.Server) {
-			if verbose {
-				s.Log = log.New(os.Stdout, "server: ", 0)
-			}
-		},
-	)
+	// Create a server per namespace
+	servers := make([]*ucs.Server, 0, len(*ports))
+	for ns, port := range *ports {
+		server := ucs.NewServer(
+			func(s *ucs.Server) { s.Cache = c },
+			func(s *ucs.Server) {
+				if verbose {
+					s.Log = log.New(os.Stdout, "server: ", 0)
+				}
+			},
+			func(s *ucs.Server) { s.Namespace = ns },
+		)
+		servers = append(servers, server)
+		go server.Listen(context.Background(), fmt.Sprintf(":%d", port))
+	}
 
 	// Set up web-server mux
 	mux := http.NewServeMux()
@@ -113,8 +93,6 @@ func main() {
 		}
 	}()
 
-	go server.Listen(context.Background(), address)
-
 	// Handle SIGINT and SIGTERM.
 	ch := make(chan os.Signal)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
@@ -126,5 +104,7 @@ func main() {
 	h.Shutdown(ctx)
 
 	// Stop the service gracefully.
-	server.Stop()
+	for _, server := range servers {
+		server.Stop()
+	}
 }

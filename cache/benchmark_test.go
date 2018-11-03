@@ -20,7 +20,7 @@ func benchmarkBackendSequentialReadBuf(b *testing.B, c Cacher, size int64) {
 	rand.Read(info)
 	cl := Line{Info: &info}
 
-	err := c.Put(key, cl)
+	err := c.Put("bench", key, cl)
 	if err != nil {
 		b.Fatalf("Unexpected error calling Put(): %s", err)
 	}
@@ -30,7 +30,7 @@ func benchmarkBackendSequentialReadBuf(b *testing.B, c Cacher, size int64) {
 
 	// Try again
 	for i := 0; i < b.N; i += 1 {
-		size, reader, err := c.Get(KIND_INFO, key)
+		size, reader, err := c.Get("bench", KIND_INFO, key)
 		if err != nil {
 			b.Fatalf("Unexpected error calling Has(): %s", err)
 		}
@@ -85,7 +85,7 @@ func BenchmarkFSPositiveStream(b *testing.B) {
 	rand.Read(info)
 	cl := Line{Info: &info}
 
-	err = c.Put(key, cl)
+	err = c.Put("bench", key, cl)
 	if err != nil {
 		b.Fatalf("Unexpected error calling Put(): %s", err)
 	}
@@ -95,7 +95,7 @@ func BenchmarkFSPositiveStream(b *testing.B) {
 
 	// Try again
 	for i := 0; i < b.N; i += 1 {
-		size, reader, err := c.Get(KIND_INFO, key)
+		size, reader, err := c.Get("bench", KIND_INFO, key)
 		if err != nil {
 			b.Fatalf("Unexpected error calling Has(): %s", err)
 		}

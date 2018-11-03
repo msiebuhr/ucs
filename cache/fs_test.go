@@ -17,10 +17,10 @@ func TestFSGeneratePath(t *testing.T) {
 	for i := range key {
 		key[i] = byte(i % 256)
 	}
-	path := fs.generatePath(KIND_INFO, key)
+	path := fs.generatePath("", KIND_INFO, key)
 
 	// Ends with <key>.info
-	suffix := "/cache5.0/00/000102030405060708090a0b0c0d0e0f-101112131415161718191a1b1c1d1e1f.info"
+	suffix := "/unity-cache/__default/00/000102030405060708090a0b0c0d0e0f-101112131415161718191a1b1c1d1e1f.info"
 	if path[len(path)-len(suffix):] != suffix {
 		t.Errorf("Unexpected suffix\n\t%s\nexpected\n\t%s", suffix, path)
 	}
@@ -28,6 +28,15 @@ func TestFSGeneratePath(t *testing.T) {
 	// Is not relative
 	if path[0] == '.' {
 		t.Errorf("Expected path '%s' to be non-relative", path)
+	}
+
+	// And with namespaces
+	path = fs.generatePath("NameSpace", KIND_INFO, key)
+
+	// Ends with <key>.info
+	suffix = "/unity-cache/NameSpace/00/000102030405060708090a0b0c0d0e0f-101112131415161718191a1b1c1d1e1f.info"
+	if path[len(path)-len(suffix):] != suffix {
+		t.Errorf("Unexpected suffix\n\t%s\nexpected\n\t%s", suffix, path)
 	}
 }
 
@@ -45,7 +54,7 @@ func TestFSReader(t *testing.T) {
 	rand.Read(key)
 
 	// Negative lookup
-	size, reader, err := c.Get(KIND_INFO, key)
+	size, reader, err := c.Get("fs", KIND_INFO, key)
 	if err != nil {
 		t.Fatalf("Unexpected error calling Get(): %#v", err)
 	}
@@ -60,13 +69,13 @@ func TestFSReader(t *testing.T) {
 	info := []byte("info")
 	cl := Line{Info: &info}
 
-	err = c.Put(key, cl)
+	err = c.Put("fs", key, cl)
 	if err != nil {
 		t.Fatalf("Unexpected error calling Put(): %s", err)
 	}
 
 	// Try again
-	size, reader, err = c.Get(KIND_INFO, key)
+	size, reader, err = c.Get("fs", KIND_INFO, key)
 	if err != nil {
 		t.Fatalf("Unexpected error calling Get(): %s", err)
 	}
@@ -101,7 +110,7 @@ func TestFSQuota(t *testing.T) {
 		rand.Read(keys[i])
 
 		cl := Line{Info: &[]byte{byte(i)}}
-		err := f.Put(keys[i], cl)
+		err := f.Put("fs", keys[i], cl)
 		if err != nil {
 			t.Fatalf("Unexpected error calling Put(): %s", err)
 		}
@@ -118,7 +127,7 @@ func TestFSQuota(t *testing.T) {
 	// Put something large and check it is bumps everything else off
 	data := make([]byte, 100)
 	cl := Line{Info: &data}
-	f.Put(make([]byte, 32), cl)
+	f.Put("fs", make([]byte, 32), cl)
 
 	// Run GC and check size is around 100
 	f.collectGarbage()
