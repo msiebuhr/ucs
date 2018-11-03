@@ -38,15 +38,49 @@
     <main role="main" class="container">
       <div class="starter-template">
         <h1>Unity Cache Server</h1>
-        <p class="lead">Plop XXXX into your Unity settings and get cracking!</p>
+		<p class="lead">Insert the appropriate server address into your Unity settings and get cracking!</p>
       </div>
-
+	  <p>Available servers are <ul id="Servers"></ul>
+	  <p>The server is running a <b id="CacheBackend"></b> backend with a quota of <b id="QuotaBytes"></b>.</p>
     </main><!-- /.container -->
 
     <!-- Optional JavaScript -->
     <!-- jQuery first, then Popper.js, then Bootstrap JS -->
-    <script src="/static/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="/static/jquery-3.3.1.min.js" crossorigin="anonymous"></script>
 <script src="/static/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
 <script src="/static/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+	<script>
+	function bytesToHuman(bytes) {
+		let size = bytes;
+		for (const suffix of ['B', 'KB', 'MB', 'GB', 'TB']) {
+			if (size < 1024) {
+				return size.toFixed(2) + ' ' + suffix;
+			}
+			size = size / 1024;
+		}
+		return size.toFixed(2) + ' ' + 'EB';
+	}
+
+	jQuery.getJSON('/api/info').then(function (body) {
+		for (let [key, value] of Object.entries(body)) {
+			const elem = $(`#${key}`);
+
+			if (key === 'QuotaBytes') {
+				value = bytesToHuman(value);
+			}
+
+			if (key === 'Servers') {
+				ul = ""
+				for (const [ns, addr] of Object.entries(value)) {
+					elem.append(`<li>${ns} → <code>${addr}</code></li>`)
+				}
+			}
+
+			else {
+			elem.text(value);
+			}
+		}
+	});
+	</script>
   </body>
 </html>
