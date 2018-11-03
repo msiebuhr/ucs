@@ -67,7 +67,7 @@ func (v Size) String() string {
 	if v.size == nil {
 		return ""
 	}
-	return units.HumanSize(float64(*v.size))
+	return units.BytesSize(float64(*v.size))
 }
 
 func (v Size) Int64() int64 {
@@ -78,7 +78,7 @@ func (v Size) Int64() int64 {
 }
 
 func (v Size) Set(s string) error {
-	b, err := units.FromHumanSize(s)
+	b, err := units.RAMInBytes(s)
 	if err != nil {
 		return err
 	}
