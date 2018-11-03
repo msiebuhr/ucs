@@ -103,7 +103,7 @@ func (m *Memory) collectGarbage(spaceToMake int64) {
 	}
 }
 
-func (c *Memory) Put(uuidAndHash []byte, data Line) error {
+func (c *Memory) Put(ns string, uuidAndHash []byte, data Line) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.generation++
@@ -112,17 +112,17 @@ func (c *Memory) Put(uuidAndHash []byte, data Line) error {
 
 	c.collectGarbage(line.size)
 
-	c.data[string(uuidAndHash)] = line
+	c.data[ns+string(uuidAndHash)] = line
 	c.size += line.size
 
 	return nil
 }
 
-func (c *Memory) Get(kind Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
+func (c *Memory) Get(ns string, kind Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	line, ok := c.data[string(uuidAndHash)]
+	line, ok := c.data[ns+string(uuidAndHash)]
 
 	if !ok {
 		return 0, nil, nil

@@ -19,6 +19,10 @@ func (k Kind) String() string {
 
 // Cacher is the interface to be implemented by caches
 type Cacher interface {
-	Put([]byte, Line) error
-	Get(Kind, []byte) (int64, io.ReadCloser, error) // Size, reader and error
+	// Put a cache-line with the given namespace and uuid/hash
+	Put(string, []byte, Line) error
+
+	// Get an asset based on its namespace, kind and uuid/hash
+	// combination. Returns the asset size, reader and error.
+	Get(string, Kind, []byte) (int64, io.ReadCloser, error)
 }
