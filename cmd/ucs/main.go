@@ -58,7 +58,7 @@ var (
 	HTTPAddress  string
 	quota        = NewSize(1e9)
 	verbose      bool
-	ports        = &customflags.FlagNSMap{}
+	ports        = &customflags.Namespaces{}
 )
 
 func init() {

@@ -10,10 +10,10 @@ import (
 	"strings"
 )
 
-type FlagNSMap map[string]uint
+type Namespaces map[string]uint
 
 // Pretty-prints namespace/port sets.
-func (f *FlagNSMap) String() string {
+func (f *Namespaces) String() string {
 	if len(*f) == 0 {
 		return ""
 	}
@@ -27,7 +27,7 @@ func (f *FlagNSMap) String() string {
 // Sets a namespace/port combination from either just a number, e.g. "5000",
 // a namespace:port set, e.g. "alpha:5000", and finally, a set of these,
 // e.g. "alpha:5000,beta:5001,5002"
-func (f FlagNSMap) Set(s string) error {
+func (f Namespaces) Set(s string) error {
 	parts := strings.Split(s, ",")
 	for _, part := range parts {
 		err := f.setSingle(part)
@@ -38,7 +38,7 @@ func (f FlagNSMap) Set(s string) error {
 	return nil
 }
 
-func (f FlagNSMap) setSingle(s string) error {
+func (f Namespaces) setSingle(s string) error {
 	portStr := s
 	name := s
 	if strings.Contains(s, ":") {
@@ -55,3 +55,4 @@ func (f FlagNSMap) setSingle(s string) error {
 	f[name] = uint(port)
 	return nil
 }
+

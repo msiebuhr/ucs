@@ -4,9 +4,9 @@ import (
 	"testing"
 )
 
-func TestFlagNSMap(t *testing.T) {
+func TestNamespaces(t *testing.T) {
 	// Flag accepts "5000" and "name:5000"
-	f := FlagNSMap{}
+	f := Namespaces{}
 
 	f.Set("5000")
 	if val, ok := f["5000"]; !ok || val != 5000 {
@@ -20,7 +20,7 @@ func TestFlagNSMap(t *testing.T) {
 }
 
 func TestFlagNSMulti(t *testing.T) {
-	f := FlagNSMap{}
+	f := Namespaces{}
 
 	f.Set("foo:42,bar:43,baz:44")
 	if val, ok := f["foo"]; !ok || val != 42 {
