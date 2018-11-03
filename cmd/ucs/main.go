@@ -22,7 +22,7 @@ import (
 var (
 	cacheBackend string
 	HTTPAddress  string
-	quota        = customflags.NewSize(1024*1024*1024)
+	quota        = customflags.NewSize(1024 * 1024 * 1024)
 	verbose      bool
 	ports        = &customflags.Namespaces{}
 )
