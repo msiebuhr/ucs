@@ -12,7 +12,7 @@ import (
 
 	"github.com/msiebuhr/ucs"
 	"github.com/msiebuhr/ucs/cache"
-	"github.com/msiebuhr/ucs/cliutils"
+	"github.com/msiebuhr/ucs/customflags"
 
 	"github.com/docker/go-units"
 	"github.com/namsral/flag"
@@ -58,7 +58,7 @@ var (
 	HTTPAddress  string
 	quota        = NewSize(1e9)
 	verbose      bool
-	ports        = &cliutils.FlagNSMap{}
+	ports        = &customflags.FlagNSMap{}
 )
 
 func init() {

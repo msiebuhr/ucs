@@ -1,4 +1,4 @@
-package cliutils
+package customflags
 
 // Flag Namespace Map is a custom type that allows the flag-package to get
 // multiple parameters of string:int (or just int), allowing it to
