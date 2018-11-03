@@ -12,6 +12,7 @@ import (
 
 type FlagNSMap map[string]uint
 
+// Pretty-prints namespace/port sets.
 func (f *FlagNSMap) String() string {
 	if len(*f) == 0 {
 		return ""
@@ -22,7 +23,22 @@ func (f *FlagNSMap) String() string {
 	}
 	return str[1:]
 }
+
+// Sets a namespace/port combination from either just a number, e.g. "5000",
+// a namespace:port set, e.g. "alpha:5000", and finally, a set of these,
+// e.g. "alpha:5000,beta:5001,5002"
 func (f FlagNSMap) Set(s string) error {
+	parts := strings.Split(s, ",")
+	for _, part := range parts {
+		err := f.setSingle(part)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (f FlagNSMap) setSingle(s string) error {
 	portStr := s
 	name := s
 	if strings.Contains(s, ":") {

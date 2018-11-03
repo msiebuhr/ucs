@@ -18,3 +18,18 @@ func TestFlagNSMap(t *testing.T) {
 		t.Errorf("Expected name => 6000, got name => %d", val)
 	}
 }
+
+func TestFlagNSMulti(t *testing.T) {
+	f := FlagNSMap{}
+
+	f.Set("foo:42,bar:43,baz:44")
+	if val, ok := f["foo"]; !ok || val != 42 {
+		t.Errorf("Expected foo => 42, got foo => %d", val)
+	}
+	if val, ok := f["bar"]; !ok || val != 43 {
+		t.Errorf("Expected bar => 43, got bar => %d", val)
+	}
+	if val, ok := f["baz"]; !ok || val != 44 {
+		t.Errorf("Expected baz => 44, got baz => %d", val)
+	}
+}

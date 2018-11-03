@@ -23,10 +23,11 @@ environment variables, making the following examples equivalent:
 
 As it is generally recommended to [use a cache per major Unity Release and
 project](https://github.com/Unity-Technologies/unity-cache-server/issues/50#issuecomment-413854421),
-the server supports *namespaces*. This is done by using multiple `-port=NUM` or
-`-port=NAME:NUM` arguments:
+the server supports *namespaces*. This is done by using multiple `-port` arguments or comma-separated list:
 
     ucs -port=8126 -port=name:8127
+	ucs -port=8126,name:8127
+	PORT=8126,name:8127 ucs
 
 They will use the same cache, but garbage-collected as one (so old projects'
 data will all but vanish and new ones will get lots of space).
