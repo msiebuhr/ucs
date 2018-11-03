@@ -59,35 +59,26 @@ func (f Namespaces) setSingle(s string) error {
 }
 
 // Quick-and-dirty human-readable sizes
-type Size struct {
-	size *int64
-}
+type Size int64
 
 func (v Size) String() string {
-	if v.size == nil {
-		return ""
-	}
-	return units.BytesSize(float64(*v.size))
+	return units.BytesSize(float64(v))
 }
 
 func (v Size) Int64() int64 {
-	if v.size == nil {
-		return 0
-	}
-	return *v.size
+	return int64(v)
 }
 
-func (v Size) Set(s string) error {
+func (v *Size) Set(s string) error {
 	b, err := units.RAMInBytes(s)
 	if err != nil {
 		return err
 	}
-	*v.size = b
+	*v = Size(b)
 	return nil
 }
 
 func NewSize(s int64) *Size {
-	size := Size{}
-	size.size = &s
+	size := Size(s)
 	return &size
 }
