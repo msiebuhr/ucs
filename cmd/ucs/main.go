@@ -14,49 +14,14 @@ import (
 	"github.com/msiebuhr/ucs/cache"
 	"github.com/msiebuhr/ucs/customflags"
 
-	"github.com/docker/go-units"
 	"github.com/namsral/flag"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// Quick-and-dirty human-readable sizes
-type Size struct {
-	size *int64
-}
-
-func (v Size) String() string {
-	if v.size == nil {
-		return ""
-	}
-	return units.HumanSize(float64(*v.size))
-}
-
-func (v Size) Int64() int64 {
-	if v.size == nil {
-		return 0
-	}
-	return *v.size
-}
-
-func (v Size) Set(s string) error {
-	b, err := units.FromHumanSize(s)
-	if err != nil {
-		return err
-	}
-	*v.size = b
-	return nil
-}
-
-func NewSize(s int64) *Size {
-	size := Size{}
-	size.size = &s
-	return &size
-}
-
 var (
 	cacheBackend string
 	HTTPAddress  string
-	quota        = NewSize(1e9)
+	quota        = customflags.NewSize(1e9)
 	verbose      bool
 	ports        = &customflags.Namespaces{}
 )

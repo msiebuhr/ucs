@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/docker/go-units"
 )
 
 type Namespaces map[string]uint
@@ -56,3 +58,36 @@ func (f Namespaces) setSingle(s string) error {
 	return nil
 }
 
+// Quick-and-dirty human-readable sizes
+type Size struct {
+	size *int64
+}
+
+func (v Size) String() string {
+	if v.size == nil {
+		return ""
+	}
+	return units.HumanSize(float64(*v.size))
+}
+
+func (v Size) Int64() int64 {
+	if v.size == nil {
+		return 0
+	}
+	return *v.size
+}
+
+func (v Size) Set(s string) error {
+	b, err := units.FromHumanSize(s)
+	if err != nil {
+		return err
+	}
+	*v.size = b
+	return nil
+}
+
+func NewSize(s int64) *Size {
+	size := Size{}
+	size.size = &s
+	return &size
+}

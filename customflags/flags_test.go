@@ -33,3 +33,12 @@ func TestFlagNSMulti(t *testing.T) {
 		t.Errorf("Expected baz => 44, got baz => %d", val)
 	}
 }
+
+func TestSize(t *testing.T) {
+	s := NewSize(1e6)
+
+	s.Set("1KB")
+	if s.Int64() != 1000 /*1024*/ {
+		t.Errorf("Expected '1K' => 1000 bytes, got %d", s.Int64());
+	}
+}
