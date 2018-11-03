@@ -75,7 +75,10 @@ func main() {
 			func(s *ucs.Server) { s.Namespace = ns },
 		)
 		servers = append(servers, server)
-		go server.Listen(context.Background(), fmt.Sprintf(":%d", port))
+		go func() {
+			err := server.Listen(context.Background(), fmt.Sprintf(":%d", port))
+			log.Fatalln("Listen:", err)
+		}()
 	}
 
 	// Set up web-server mux
@@ -89,7 +92,7 @@ func main() {
 	// Start it
 	go func() {
 		if err := h.ListenAndServe(); err != nil {
-			log.Println("ListenAndServe: ", err)
+			log.Fatalln("ListenAndServe: ", err)
 		}
 	}()
 
