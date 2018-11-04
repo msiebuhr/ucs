@@ -61,12 +61,12 @@ jobs:
       - checkout
       - run: mkdir -p $TEST_RESULTS
 
-      #- run:
-      #    name: Generate
-      #    command: |
-      #        go get -u github.com/mjibson/esc
-      #        go generate ./...
-      #        git diff --exit-code ./frontend/
+      - run:
+          name: Generate
+          command: |
+              go get -u github.com/mjibson/esc
+              go generate ./...
+              git diff --exit-code ./frontend/
 
       - run:
           name: Bench
