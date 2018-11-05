@@ -13,36 +13,33 @@
     <link rel="stylesheet" href="/static/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
     
   </head>
-  <body>
-	 <nav class="navbar navbar-expand-md navbar-dark bg-dark">
-	 <a class="navbar-brand" href="#">
-	   <img src="/icon.svg" width="30" height="30" class="d-inline-block align-top" alt="" style="filter: invert(100%)">
-	   UCS
-     </a>
-      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExampleDefault" aria-controls="navbarsExampleDefault" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
+  <body class="bg-light">
+    <div class="container">
+      <!-- HEADER -->
+      <div class="py-5 text-center">
+        <img class="d-block mx-auto mb-4" src="/icon.svg" alt="" width="72" height="72">
+        <h2>Unity Cache Server</h2>
+        <p class="lead">Get faster builds by caching assets!</p>
+      </div>
 
-      <div class="collapse navbar-collapse" id="navbarsExampleDefault">
-        <ul class="navbar-nav mr-auto">
-          <li class="nav-item active">
-            <a class="nav-link" href="#">Home <span class="sr-only">(current)</span></a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="/metrics">Metrics</a>
-          </li>
+      <!-- Main text -->
+      <main role="row">
+        <p>Available servers are <ul id="Servers"></ul>
+        <p>The server is running a <b id="CacheBackend"></b> backend with a quota of <b id="QuotaBytes"></b>.</p>
+      </main>
+
+      <!-- Footer -->
+      <footer class="my-5 pt-5 text-muted text-center text-small">
+        <hr>
+        <p class="mb-1">
+          Independently developed by <a href="https://sbhr.dk">Morten Siebuhr</a>,
+          icon by <a href="https://www.iconfinder.com/icons/998676/challenge_game_puzzle_rubik_icon">Elizabeth Arostegui</a></p>
+        <ul class="list-inline">
+          <li class="list-inline-item"><a href="http://github.com/msiebuhr/ucs">GitHub</a></li>
+          <li class="list-inline-item"><a href="/metrics">Metrics</a></li>
         </ul>
-      </div>
-    </nav>
-
-    <main role="main" class="container">
-      <div class="starter-template">
-        <h1>Unity Cache Server</h1>
-		<p class="lead">Insert the appropriate server address into your Unity settings and get cracking!</p>
-      </div>
-	  <p>Available servers are <ul id="Servers"></ul>
-	  <p>The server is running a <b id="CacheBackend"></b> backend with a quota of <b id="QuotaBytes"></b>.</p>
-    </main><!-- /.container -->
+      </footer>
+    </div>
 
     <!-- Optional JavaScript -->
     <!-- jQuery first, then Popper.js, then Bootstrap JS -->
