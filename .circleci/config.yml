@@ -21,6 +21,12 @@ jobs:
       - checkout
       - run: mkdir -p $TEST_RESULTS
 
+      - run:
+          name: go fmt
+          command: |
+              go fmt ./...
+              git diff --exit-code
+
       - run: go get -u github.com/jstemmer/go-junit-report
       - run:
           name: Unit tests
@@ -46,7 +52,6 @@ jobs:
       - store_artifacts:
           path: /tmp/test-results
           destination: raw-test-output
-
 
       - store_test_results:
           path: /tmp/test-results
