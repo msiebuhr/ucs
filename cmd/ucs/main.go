@@ -45,8 +45,10 @@ func main() {
 		ports.Set("default:8126")
 	}
 
-	log.Println("Starting. Quota ", quota)
-	log.Println("Starting. Ports ", ports)
+	log.Printf(
+		"Starting quota=%s ports=%s httpAddress=%s\n",
+		quota, ports, HTTPAddress,
+	)
 
 	// Figure out a cache
 	var c cache.Cacher
