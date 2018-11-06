@@ -36,9 +36,13 @@ jobs:
       - run:
           name: Binaries
           command: |
-              go build -race -ldflags "-extldflags '-static'" -o /tmp/ucs ./cmd/ucs/
-              go build -race -ldflags "-extldflags '-static'" -o /tmp/ucs-test ./cmd/ucs-test/
-              go build -race -ldflags "-extldflags '-static'" -o /tmp/ucs-bender ./cmd/ucs-bender/
+              go build -race -ldflags "-extldflags '-static'" -o /tmp/bin/ucs-linux-x64 ./cmd/ucs/
+              go build -race -ldflags "-extldflags '-static'" -o /tmp/bin/ucs-test-linux-x64 ./cmd/ucs-test/
+              go build -race -ldflags "-extldflags '-static'" -o /tmp/bin/ucs-bender-linux-x64 ./cmd/ucs-bender/
+
+      - store_artifacts:
+          path: /tmp/bin/
+          destination: binaries
 
       - store_artifacts:
           path: /tmp/test-results
