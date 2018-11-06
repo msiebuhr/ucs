@@ -32,6 +32,12 @@ func TestFlagNSMulti(t *testing.T) {
 	if val, ok := f["baz"]; !ok || val != 44 {
 		t.Errorf("Expected baz => 44, got baz => %d", val)
 	}
+
+	str := "foo:42 bar:43 baz:44"
+	out := f.String()
+	if len(out) != len(str) {
+		t.Errorf("Expected Stringer to return %d digits (ex. %s), got %d (%s)", len(str), str, len(out), out)
+	}
 }
 
 func TestSize(t *testing.T) {

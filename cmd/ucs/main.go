@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +15,7 @@ import (
 	"github.com/msiebuhr/ucs"
 	"github.com/msiebuhr/ucs/cache"
 	"github.com/msiebuhr/ucs/customflags"
+	"github.com/msiebuhr/ucs/frontend"
 
 	"github.com/namsral/flag"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -44,8 +47,10 @@ func main() {
 		ports.Set("default:8126")
 	}
 
-	log.Println("Starting. Quota ", quota)
-	log.Println("Starting. Ports ", ports)
+	log.Printf(
+		"Starting quota=%s ports=%s httpAddress=%s\n",
+		quota, ports, HTTPAddress,
+	)
 
 	// Figure out a cache
 	var c cache.Cacher
@@ -79,12 +84,60 @@ func main() {
 			func(s *ucs.Server) { s.Namespace = ns },
 		)
 		servers = append(servers, server)
-		go server.Listen(context.Background(), fmt.Sprintf(":%d", port))
+		go func(port uint) {
+			err := server.Listen(context.Background(), fmt.Sprintf(":%d", port))
+			log.Fatalln("Listen:", err)
+		}(port)
 	}
 
 	// Set up web-server mux
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/", http.FileServer(frontend.FS(false)))
+	mux.HandleFunc("/api/info", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
+		// Figure out our IP
+		var ip net.IP
+		addrs, _ := net.InterfaceAddrs()
+		for _, addr := range addrs {
+			var i net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				i = v.IP
+			case *net.IPAddr:
+				i = v.IP
+			}
+			// Is this the right way to detect the IP?
+			if i.IsGlobalUnicast() {
+				ip = i
+				break
+			}
+		}
+
+		servers := map[string]string{}
+		for ns, port := range *ports {
+			// Parse address to figure out what port/ip we're bound to
+			tcpAddr := net.TCPAddr{
+				IP:   ip,
+				Port: int(port),
+			}
+			servers[ns] = tcpAddr.String()
+		}
+
+		data := struct {
+			QuotaBytes   int64
+			Servers      map[string]string
+			CacheBackend string
+		}{
+			QuotaBytes:   quota.Int64(),
+			Servers:      servers,
+			CacheBackend: cacheBackend,
+		}
+
+		e := json.NewEncoder(w)
+		e.Encode(data)
+	})
 
 	// Create the web-server itself
 	h := &http.Server{Addr: HTTPAddress, Handler: mux}
@@ -92,7 +145,7 @@ func main() {
 	// Start it
 	go func() {
 		if err := h.ListenAndServe(); err != nil {
-			log.Println("ListenAndServe: ", err)
+			log.Fatalln("ListenAndServe: ", err)
 		}
 	}()
 

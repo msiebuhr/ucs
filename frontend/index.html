@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Unity Cache Server</title>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Favicon -->
+    <link rel="shortcut icon" type="image/png" href="icon.png"/>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="/static/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    
+  </head>
+  <body class="bg-light">
+    <div class="container">
+      <!-- HEADER -->
+      <div class="py-5 text-center">
+        <img class="d-block mx-auto mb-4" src="/icon.svg" alt="" width="72" height="72">
+        <h2>Unity Cache Server</h2>
+        <p class="lead">Get faster builds by caching assets!</p>
+      </div>
+
+      <!-- Main text -->
+      <main role="row">
+        <p>Available servers are <ul id="Servers"></ul>
+        <p>The server is running a <b id="CacheBackend"></b> backend with a quota of <b id="QuotaBytes"></b>.</p>
+      </main>
+
+      <!-- Footer -->
+      <footer class="my-5 pt-5 text-muted text-center text-small">
+        <hr>
+        <p class="mb-1">
+          Independently developed by <a href="https://sbhr.dk">Morten Siebuhr</a>,
+          icon by <a href="https://www.iconfinder.com/icons/998676/challenge_game_puzzle_rubik_icon">Elizabeth Arostegui</a></p>
+        <ul class="list-inline">
+          <li class="list-inline-item"><a href="http://github.com/msiebuhr/ucs">GitHub</a></li>
+          <li class="list-inline-item"><a href="/metrics">Metrics</a></li>
+        </ul>
+      </footer>
+    </div>
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="/static/jquery-3.3.1.min.js" crossorigin="anonymous"></script>
+<script src="/static/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+<script src="/static/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+	<script>
+	function bytesToHuman(bytes) {
+		let size = bytes;
+		for (const suffix of ['B', 'KB', 'MB', 'GB', 'TB']) {
+			if (size < 1024) {
+				return size.toFixed(2) + ' ' + suffix;
+			}
+			size = size / 1024;
+		}
+		return size.toFixed(2) + ' ' + 'EB';
+	}
+
+	jQuery.getJSON('/api/info').then(function (body) {
+		for (let [key, value] of Object.entries(body)) {
+			const elem = $(`#${key}`);
+
+			if (key === 'QuotaBytes') {
+				value = bytesToHuman(value);
+			}
+
+			if (key === 'Servers') {
+				ul = ""
+				for (const [ns, addr] of Object.entries(value)) {
+					elem.append(`<li>${ns} → <code>${addr}</code></li>`)
+				}
+			}
+
+			else {
+			elem.text(value);
+			}
+		}
+	});
+	</script>
+  </body>
+</html>
