@@ -19,15 +19,17 @@ import (
 )
 
 var (
-	cacheBackend string
-	HTTPAddress  string
-	quota        = customflags.NewSize(1024 * 1024 * 1024)
-	verbose      bool
-	ports        = &customflags.Namespaces{}
+	cacheBackend    string
+	fsCacheBasepath string
+	HTTPAddress     string
+	quota           = customflags.NewSize(1024 * 1024 * 1024)
+	verbose         bool
+	ports           = &customflags.Namespaces{}
 )
 
 func init() {
 	flag.StringVar(&cacheBackend, "cache-backend", "fs", "Cache backend (fs or memory)")
+	flag.StringVar(&fsCacheBasepath, "path", "./unity-cache", "Where FS cache should store data")
 	flag.StringVar(&HTTPAddress, "http-address", ":9126", "Address and port for HTTP metrics/admin interface")
 	flag.BoolVar(&verbose, "verbose", false, "Spew more info")
 	flag.Var(quota, "quota", "Storage quota (ex. 10GB, 1TB, ...)")
@@ -50,7 +52,10 @@ func main() {
 	switch cacheBackend {
 	case "fs":
 		var err error
-		c, err = cache.NewFS(func(f *cache.FS) { f.Quota = quota.Int64() })
+		c, err = cache.NewFS(func(f *cache.FS) {
+			f.Quota = quota.Int64()
+			f.Basepath = fsCacheBasepath
+		})
 		if err != nil {
 			panic(err)
 		}
