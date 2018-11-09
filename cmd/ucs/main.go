@@ -32,7 +32,7 @@ var (
 
 func init() {
 	flag.StringVar(&cacheBackend, "cache-backend", "fs", "Cache backend (fs or memory)")
-	flag.StringVar(&fsCacheBasepath, "path", "./unity-cache", "Where FS cache should store data")
+	flag.StringVar(&fsCacheBasepath, "cache-path", "./unity-cache", "Where FS cache should store data")
 	flag.StringVar(&HTTPAddress, "http-address", ":9126", "Address and port for HTTP metrics/admin interface")
 	flag.BoolVar(&verbose, "verbose", false, "Spew more info")
 	flag.Var(quota, "quota", "Storage quota (ex. 10GB, 1TB, ...)")
@@ -48,8 +48,8 @@ func main() {
 	}
 
 	log.Printf(
-		"Starting quota=%s ports=%s httpAddress=%s\n",
-		quota, ports, HTTPAddress,
+		"Starting quota=%s ports=%s httpAddress=%s fsCacheBasepath=%s\n",
+		quota, ports, HTTPAddress, fsCacheBasepath,
 	)
 
 	// Figure out a cache
