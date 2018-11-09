@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -46,6 +47,7 @@ func main() {
 	if len(*ports) == 0 {
 		ports.Set("default:8126")
 	}
+	fsCacheBasepath, _ = filepath.Abs(fsCacheBasepath)
 
 	log.Printf(
 		"Starting quota=%s ports=%s httpAddress=%s fsCacheBasepath=%s\n",
