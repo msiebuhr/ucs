@@ -277,3 +277,15 @@ func (fs *FS) Get(ns string, kind Kind, uuidAndHash []byte) (int64, io.ReadClose
 
 	return stat.Size(), f, nil
 }
+
+func (fs *FS) Search(ns string, prefix []byte) (<-chan LineInfo, error) {
+	ch := make(chan LineInfo, 0)
+
+	close(ch)
+
+	return ch, nil
+}
+
+func (fs *FS) Remove(ns string, prefix []byte) (int, error) {
+	return 0, nil
+}

@@ -20,3 +20,13 @@ func (n *NOP) Get(ns string, k Kind, uuidAndHash []byte) (int64, io.ReadCloser, 
 	return 0, nil, nil
 	//return false, ioutil.NopCloser(strings.NewReader("")), nil)
 }
+
+func (n NOP) Search(ns string, prefix []byte) (<-chan LineInfo, error) {
+	ch := make(chan LineInfo, 0)
+
+	close(ch)
+
+	return ch, nil
+}
+
+func (n NOP) Remove(ns string, prefix []byte) (int, error) { return 0, nil }

@@ -2,8 +2,10 @@ package cache
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"strings"
 	"sync"
 	"time"
 
@@ -136,4 +138,62 @@ func (c *Memory) Get(ns string, kind Kind, uuidAndHash []byte) (int64, io.ReadCl
 	}
 
 	return 0, nil, nil
+}
+
+func (m Memory) Search(ns string, prefix []byte) (<-chan LineInfo, error) {
+	ch := make(chan LineInfo, 0)
+
+	strPrefix := ns + string(prefix)
+
+	go func() {
+		m.lock.Lock()
+		defer close(ch)
+		defer m.lock.Unlock()
+
+		for key, entry := range m.data {
+			if strings.HasPrefix(key, strPrefix) {
+				fmt.Println(ns, key)
+				info := LineInfo{
+					UuidAndHash: []byte(strings.TrimPrefix(key, ns)),
+				}
+
+				if data, ok := entry.Get(KIND_INFO); ok {
+					info.InfoSize = len(data)
+				}
+				if data, ok := entry.Get(KIND_ASSET); ok {
+					info.AssetSize = len(data)
+				}
+				if data, ok := entry.Get(KIND_RESOURCE); ok {
+					info.ResourceSize = len(data)
+				}
+
+				ch <- info
+			}
+		}
+	}()
+
+	return ch, nil
+}
+
+// TODO
+func (m *Memory) Remove(ns string, prefix []byte) (int, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	// If we can find the prefix exactly in the list, just delete it
+	strPrefix := ns + string(prefix)
+	if _, ok := m.data[strPrefix]; ok {
+		delete(m.data, strPrefix)
+		return 1, nil
+	}
+
+	deletions := 0
+	for key, _ := range m.data {
+		if strings.HasPrefix(key, strPrefix) {
+			deletions += 1
+			delete(m.data, key)
+		}
+	}
+
+	return deletions, nil
 }
