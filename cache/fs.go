@@ -69,6 +69,9 @@ func NewFS(options ...func(*FS)) (*FS, error) {
 // Also re-calculates the total size of cache directory, now we're at scanning
 // everything anyway...
 func (fs *FS) collectGarbage() {
+	// Report quota up front
+	fs_quota.Set(float64(fs.Quota))
+
 	start := time.Now()
 
 	fs.lock.Lock()
@@ -173,8 +176,6 @@ func (fs *FS) collectGarbage() {
 		}
 	}
 
-	fs_quota.Set(float64(fs.Quota))
-
 	// If we're still over quota, do another round of GC'ing
 	if fs.Size > fs.Quota {
 		go fs.collectGarbage()
@@ -224,6 +225,7 @@ func (fs *FS) Put(ns string, uuidAndHash []byte, data Line) error {
 
 	// Kick of GC if we're above the size
 	fs.Size += data.Size()
+	fs_size.WithLabelValues(ns).Add(float64(data.Size()))
 	if fs.Size > fs.Quota {
 		go fs.collectGarbage()
 	}
