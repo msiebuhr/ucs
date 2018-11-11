@@ -27,6 +27,12 @@ func (b UUIDAndHash) Bytes() []byte {
 	return out
 }
 
+func (b UUIDAndHash) WriteTo(w io.Writer) (int64, error) {
+	c, err := w.Write(b.Bytes())
+	return int64(c), err
+}
+
+// ReadFrom implements io.ReaderFrom
 func (u *UUIDAndHash) ReadFrom(r io.Reader) (int64, error) {
 	bytes := make([]byte, 32)
 	count, err := io.ReadFull(r, bytes)

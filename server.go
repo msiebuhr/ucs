@@ -201,7 +201,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	// Set deadline for getting data five seconds in the future
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
-	trx := make([]byte, 0)
+	var trx *cache.UUIDAndHash
 	trxData := cache.Line{}
 
 	// First, read uint32 version number
@@ -264,29 +264,32 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			ops.WithLabelValues(s.Namespace, "g").Inc()
 
 			// Read uuidAndHash
-			uuidAndHash := make([]byte, 32)
-			_, err := io.ReadFull(rw, uuidAndHash)
+			uah := &cache.UUIDAndHash{}
+			_, err := uah.ReadFrom(rw)
 
-			s.logf(ctx, "Get '%c' '%s'", cmdType, PrettyUuidAndHash(uuidAndHash))
+			s.logf(ctx, "Get '%c' '%s'", cmdType, uah)
 
-			size, reader, err := s.Cache.Get(s.Namespace, cache.Kind(cmdType), uuidAndHash)
+			size, reader, err := s.Cache.Get(s.Namespace, cache.Kind(cmdType), uah.Bytes())
 			if err != nil {
 				getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "miss").Inc()
 				s.log(ctx, "Error reading from cache:", err)
-				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
+				fmt.Fprintf(rw, "-%c", cmdType)
+				uah.WriteTo(rw)
 				continue
 			}
 			if size == 0 {
 				getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "miss").Inc()
 				s.log(ctx, "Cache miss")
-				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
+				fmt.Fprintf(rw, "-%c", cmdType)
+				uah.WriteTo(rw)
 				if reader != nil {
 					reader.Close()
 				}
 				continue
 			}
 
-			fmt.Fprintf(rw, "+%c%016x%s", cmdType, size, uuidAndHash)
+			fmt.Fprintf(rw, "+%c%016x", cmdType, size)
+			uah.WriteTo(rw)
 			io.Copy(rw, reader)
 			reader.Close()
 			getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "hit").Inc()
@@ -300,22 +303,22 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			ops.WithLabelValues(s.Namespace, "ts").Inc()
 
 			// Bail if we're already in a command
-			if len(trx) > 0 {
+			if trx != nil {
 				s.log(ctx, "Error starting trx inside trx")
 				return
 			}
 
 			// Read uuidAndHash
-			uuidAndHash := make([]byte, 32)
-			_, err := io.ReadFull(rw, uuidAndHash)
+			uah := &cache.UUIDAndHash{}
+			_, err := uah.ReadFrom(rw)
 			if err != nil {
 				s.log(ctx, "Error reading uuid+hash:", err)
 				return
 			}
 
-			s.logf(ctx, "Transaction started for %s", PrettyUuidAndHash(uuidAndHash))
+			s.logf(ctx, "Transaction started for %s", uah)
 
-			trx = uuidAndHash
+			trx = uah
 			continue
 		}
 
@@ -323,18 +326,18 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 		if cmd == 't' && cmdType == 'e' {
 			ops.WithLabelValues(s.Namespace, "te").Inc()
 
-			if len(trx) == 0 {
+			if trx == nil {
 				s.log(ctx, "Error ending trx - none started")
 				return
 			}
 
-			err := s.Cache.Put(s.Namespace, trx, trxData)
+			err := s.Cache.Put(s.Namespace, trx.Bytes(), trxData)
 			if err != nil {
 				s.log(ctx, "Error ending trx - cache put error:", err)
 				continue
 			}
 
-			trx = []byte{}
+			trx = nil
 			trxData = cache.Line{}
 			continue
 		}
