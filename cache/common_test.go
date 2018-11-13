@@ -3,11 +3,12 @@ package cache
 import (
 	"math/rand"
 	"os"
+	"strings"
 	"testing"
 )
 
 // TODO: Make table-driven
-func TestNamespacing(t *testing.T) {
+func TestAll(t *testing.T) {
 	caches := map[string]Cacher{
 		"nop": NewNOP(),
 		"mem": NewMemory(1e6),
@@ -21,14 +22,24 @@ func TestNamespacing(t *testing.T) {
 
 	for name, cache := range caches {
 		t.Run(name, func(t *testing.T) {
-			test_namespacing(t, cache)
+			t.Run("namespacing", func(t *testing.T) {
+				test_namespacing(t, cache)
+			})
+
+			// Write-related tests are skipped for NOP
+			if _, ok := cache.(*NOP); ok {
+				return
+			}
+
+			t.Run("PutTransaction", func(t *testing.T) {
+				test_commit_transaction(t, cache)
+			})
 		})
 	}
 
 	defer func() {
 		os.RemoveAll(c.Basepath)
 	}()
-
 }
 
 func test_namespacing(t *testing.T, c Cacher) {
@@ -67,4 +78,23 @@ func test_namespacing(t *testing.T, c Cacher) {
 	if reader != nil {
 		t.Errorf("Got non-nil io.ReadCloser back: %+v", reader)
 	}
+}
+
+func test_commit_transaction(t *testing.T, c Cacher) {
+	key := make([]byte, 32)
+	rand.Read(key)
+
+	// Put wia a transaction
+	tx := c.PutTransaction("tx", key)
+	err := tx.Put(6, KIND_INFO, strings.NewReader("foobar"))
+	if err != nil {
+		t.Fatalf("Unexpected error calling Put(): %#v", err)
+	}
+
+	// Commit
+	// TODO: Try doing a read before this!
+	tx.Commit()
+
+	// Positive lookup for `key`
+	testCacheHit(t, c, "tx", KIND_INFO, key, []byte("foobar"))
 }

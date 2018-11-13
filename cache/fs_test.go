@@ -41,7 +41,7 @@ func TestFSGeneratePath(t *testing.T) {
 }
 
 func TestFSReader(t *testing.T) {
-	c, err := NewFS(func(f *FS) { f.Basepath = "./testdata"; f.Quota = 100 })
+	c, err := NewFS(func(f *FS) { f.Basepath = "./testdata/test-fs-reader/"; f.Quota = 100 })
 	if err != nil {
 		t.Fatalf("Error creating FS: %s", err)
 	}
@@ -97,10 +97,13 @@ func TestFSReader(t *testing.T) {
 }
 
 func TestFSQuota(t *testing.T) {
-	f, err := NewFS(func(f *FS) { f.Quota = 100; f.Basepath = "./testdata" })
+	f, err := NewFS(func(f *FS) { f.Quota = 100; f.Basepath = "./testdata/fs-quota/" })
 	if err != nil {
 		t.Fatalf("Error creating FS: %s", err)
 	}
+	defer func() {
+		os.RemoveAll(f.Basepath)
+	}()
 
 	keys := make([][]byte, 100)
 

@@ -277,3 +277,73 @@ func (fs *FS) Get(ns string, kind Kind, uuidAndHash []byte) (int64, io.ReadClose
 
 	return stat.Size(), f, nil
 }
+
+func (fs *FS) PutTransaction(ns string, uuidAndHash []byte) Transaction {
+	return &FSTx{
+		fs:          fs,
+		ns:          ns,
+		nsPrefix:    "should-be-replaced",
+		uuidAndHash: uuidAndHash,
+	}
+}
+
+type FSTx struct {
+	fs          *FS
+	ns          string
+	nsPrefix    string
+	uuidAndHash []byte
+}
+
+func (t *FSTx) Put(size int64, kind Kind, r io.Reader) error {
+	path := t.fs.generatePath(t.nsPrefix+t.ns, kind, t.uuidAndHash)
+
+	// Make sure leading directory exists!
+	leadingPath := filepath.Join(t.fs.Basepath, t.nsPrefix+t.ns, fmt.Sprintf("%02x", t.uuidAndHash[:1]))
+	os.MkdirAll(leadingPath, os.ModePerm)
+
+	// TODO: Ensure paths are prefixed with t.fs.Basepath (i.e. if nsPrefix has dots in it...)
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, r)
+	return err
+}
+
+func (t *FSTx) Commit() error {
+	// TODO: We need to move individual files, as the new folder could already exist (and OS's usually aren't nice and does merging of directory contents for us).
+	newpath := filepath.Join(
+		t.fs.Basepath,
+		t.ns,
+		fmt.Sprintf("%02x", t.uuidAndHash[:1]),
+	)
+	os.MkdirAll(newpath, os.ModePerm)
+
+	var err error
+
+	for _, k := range []Kind{KIND_ASSET, KIND_INFO, KIND_RESOURCE} {
+		from := t.fs.generatePath(t.nsPrefix+t.ns, k, t.uuidAndHash)
+		to := t.fs.generatePath(t.ns, k, t.uuidAndHash)
+
+		e := os.Rename(from, to)
+		if e != nil {
+			err = e
+		}
+	}
+	return err
+}
+
+func (t *FSTx) Abort() error {
+	path := filepath.Join(
+		t.fs.Basepath,
+		t.nsPrefix+t.ns,
+		fmt.Sprintf("%02x", t.uuidAndHash[:1]),
+	)
+
+	// TODO: Ensure path is prefixed with t.fs.Basepath (i.e. if nsPrefix has dots in it...)
+
+	return os.RemoveAll(path)
+}

@@ -32,12 +32,16 @@ type memoryEntry struct {
 	size       int64
 }
 
-func memoryEntryFromLine(generation int, line Line) memoryEntry {
-	m := memoryEntry{
+func newMemoryEntry(generation int) memoryEntry {
+	return memoryEntry{
 		generation: generation,
 		data:       make(map[Kind][]byte),
 		size:       0,
 	}
+}
+
+func memoryEntryFromLine(generation int, line Line) memoryEntry {
+	m := newMemoryEntry(generation)
 
 	if data, ok := line.Get(KIND_ASSET); ok {
 		m.data[KIND_ASSET] = data
@@ -136,4 +140,54 @@ func (c *Memory) Get(ns string, kind Kind, uuidAndHash []byte) (int64, io.ReadCl
 	}
 
 	return 0, nil, nil
+}
+
+func (m *Memory) PutTransaction(ns string, uuidAndHash []byte) Transaction {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return &MemoryTx{
+		mem:         m,
+		ns:          ns,
+		uuidAndHash: uuidAndHash,
+		entry:       newMemoryEntry(m.generation),
+	}
+}
+
+type MemoryTx struct {
+	mem         *Memory
+	ns          string
+	uuidAndHash []byte
+	entry       memoryEntry
+}
+
+func (t *MemoryTx) Put(size int64, kind Kind, r io.Reader) error {
+	data := make([]byte, size)
+	_, err := io.ReadFull(r, data)
+	if err != nil {
+		return err
+	}
+	t.entry.data[kind] = data
+	t.entry.size += size
+	return nil
+}
+
+func (t *MemoryTx) Commit() error {
+	t.mem.lock.Lock()
+	defer t.mem.lock.Unlock()
+	t.mem.generation++
+
+	t.entry.generation = t.mem.generation
+
+	t.mem.collectGarbage(t.entry.size)
+
+	t.mem.data[t.ns+string(t.uuidAndHash)] = t.entry
+	t.mem.size += t.entry.size
+
+	return nil
+}
+
+func (t *MemoryTx) Abort() error {
+	// NOP - GC will remove the reference.
+	return nil
 }
