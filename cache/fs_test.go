@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestFSGeneratePath(t *testing.T) {
+func TestFSGenerateFilename(t *testing.T) {
 	fs, err := NewFS()
 	if err != nil {
 		t.Fatalf("Could not create FS: %s", err)
@@ -17,7 +17,7 @@ func TestFSGeneratePath(t *testing.T) {
 	for i := range key {
 		key[i] = byte(i % 256)
 	}
-	path := fs.generatePath("", KIND_INFO, key)
+	path := fs.generateFilename("", KIND_INFO, key)
 
 	// Ends with <key>.info
 	suffix := "/unity-cache/__default/00/000102030405060708090a0b0c0d0e0f-101112131415161718191a1b1c1d1e1f.info"
@@ -31,7 +31,7 @@ func TestFSGeneratePath(t *testing.T) {
 	}
 
 	// And with namespaces
-	path = fs.generatePath("NameSpace", KIND_INFO, key)
+	path = fs.generateFilename("NameSpace", KIND_INFO, key)
 
 	// Ends with <key>.info
 	suffix = "/unity-cache/NameSpace/00/000102030405060708090a0b0c0d0e0f-101112131415161718191a1b1c1d1e1f.info"
