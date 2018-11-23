@@ -67,12 +67,12 @@ func TestFSReader(t *testing.T) {
 
 	// Put non-empty cacheline in
 	info := []byte("info")
-	cl := Line{Info: &info}
-
-	err = c.Put("fs", key, cl)
+	tx := c.PutTransaction("fs", key)
+	err = tx.Put(int64(len(info)), KIND_INFO, bytes.NewReader(info))
 	if err != nil {
 		t.Fatalf("Unexpected error calling Put(): %s", err)
 	}
+	tx.Commit()
 
 	// Try again
 	size, reader, err = c.Get("fs", KIND_INFO, key)
@@ -112,11 +112,12 @@ func TestFSQuota(t *testing.T) {
 		keys[i] = make([]byte, 32)
 		rand.Read(keys[i])
 
-		cl := Line{Info: &[]byte{byte(i)}}
-		err := f.Put("fs", keys[i], cl)
+		tx := f.PutTransaction("fs", keys[i])
+		err := tx.Put(1, KIND_INFO, bytes.NewReader([]byte{byte(i)}))
 		if err != nil {
 			t.Fatalf("Unexpected error calling Put(): %s", err)
 		}
+		tx.Commit()
 
 		// Run the garbage collector explicitly
 		f.collectGarbage()
@@ -129,8 +130,9 @@ func TestFSQuota(t *testing.T) {
 
 	// Put something large and check it is bumps everything else off
 	data := make([]byte, 100)
-	cl := Line{Info: &data}
-	f.Put("fs", make([]byte, 32), cl)
+	tx := f.PutTransaction("fs", make([]byte, 32))
+	tx.Put(int64(len(data)), KIND_INFO, bytes.NewReader(data))
+	tx.Commit()
 
 	// Run GC and check size is around 100
 	f.collectGarbage()

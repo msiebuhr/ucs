@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"bytes"
 	"math/rand"
 	"os"
 	"strings"
@@ -60,12 +61,9 @@ func test_namespacing(t *testing.T, c Cacher) {
 
 	// Put things in 'a' namespaace
 	info := []byte("info")
-	cl := Line{Info: &info}
-
-	err = c.Put("a", key, cl)
-	if err != nil {
-		t.Fatalf("Unexpected error calling Put(): %s", err)
-	}
+	tx := c.PutTransaction("a", key)
+	tx.Put(int64(len(info)), KIND_INFO, bytes.NewReader(info))
+	tx.Commit()
 
 	// Negative lookup for key in 'b'
 	size, reader, err = c.Get("b", KIND_INFO, key)
