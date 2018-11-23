@@ -228,44 +228,6 @@ func (fs *FS) putKind(ns string, kind Kind, uuidAndHash, data []byte) error {
 	return nil
 }
 
-func (fs *FS) Put(ns string, uuidAndHash []byte, data Line) error {
-	fs.lock.Lock()
-	defer fs.lock.Unlock()
-
-	// Kick of GC if we're above the size
-	fs.Size += data.Size()
-	fs_size.WithLabelValues(ns).Add(float64(data.Size()))
-	if fs.Size > fs.Quota {
-		go fs.collectGarbage()
-	}
-
-	// Make sure leading directory exists!
-	leadingPath := filepath.Join(fs.Basepath, ns, fmt.Sprintf("%02x", uuidAndHash[:1]))
-	os.MkdirAll(leadingPath, os.ModePerm)
-
-	// Loop over types in the Put
-	if data.Info != nil {
-		err := fs.putKind(ns, KIND_INFO, uuidAndHash, *data.Info)
-		if err != nil {
-			return err
-		}
-	}
-	if data.Resource != nil {
-		err := fs.putKind(ns, KIND_RESOURCE, uuidAndHash, *data.Resource)
-		if err != nil {
-			return err
-		}
-	}
-	if data.Asset != nil {
-		err := fs.putKind(ns, KIND_ASSET, uuidAndHash, *data.Asset)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (fs *FS) Get(ns string, kind Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
 	path := fs.generateFilename(ns, kind, uuidAndHash)
 

@@ -107,21 +107,6 @@ func (m *Memory) collectGarbage(spaceToMake int64) {
 	}
 }
 
-func (c *Memory) Put(ns string, uuidAndHash []byte, data Line) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	c.generation++
-
-	line := memoryEntryFromLine(c.generation, data)
-
-	c.collectGarbage(line.size)
-
-	c.data[ns+string(uuidAndHash)] = line
-	c.size += line.size
-
-	return nil
-}
-
 func (c *Memory) Get(ns string, kind Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()

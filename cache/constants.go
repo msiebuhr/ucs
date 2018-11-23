@@ -30,9 +30,6 @@ type Transaction interface {
 
 // Cacher is the interface to be implemented by caches
 type Cacher interface {
-	// Put a cache-line with the given namespace and uuid/hash
-	Put(string, []byte, Line) error
-
 	// Start an upload transaction
 	PutTransaction(ns string, uuidAndHash []byte) Transaction
 

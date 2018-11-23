@@ -21,11 +21,6 @@ func NewNOP() *NOP {
 	return &NOP{}
 }
 
-// Discards all given data
-func (n *NOP) Put(ns string, uuidAndHash []byte, data Line) error {
-	return nil
-}
-
 // Return emoty readers
 func (n *NOP) Get(ns string, k Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
 	return 0, nil, nil
