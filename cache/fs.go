@@ -292,7 +292,7 @@ func (fs *FS) PutTransaction(ns string, uuidAndHash []byte) Transaction {
 	return &FSTx{
 		fs:          fs,
 		ns:          ns,
-		nsPrefix:    fmt.Sprintf("tx-%010d-", count),
+		nsSuffix:    fmt.Sprintf(".tx-%010d", count),
 		uuidAndHash: uuidAndHash,
 		kinds:       []Kind{},
 	}
@@ -301,7 +301,7 @@ func (fs *FS) PutTransaction(ns string, uuidAndHash []byte) Transaction {
 type FSTx struct {
 	fs          *FS
 	ns          string
-	nsPrefix    string
+	nsSuffix    string
 	uuidAndHash []byte
 
 	// Track what kinds have been uploaded
@@ -311,11 +311,10 @@ type FSTx struct {
 func (t *FSTx) Put(size int64, kind Kind, r io.Reader) error {
 	t.kinds = append(t.kinds, kind)
 	// Make sure leading directory exists!
-	leadingPath := t.fs.generateDir(t.nsPrefix+t.ns, t.uuidAndHash)
+	leadingPath := t.fs.generateDir(t.ns, t.uuidAndHash)
 	os.MkdirAll(leadingPath, os.ModePerm)
 
-	// TODO: Ensure paths are prefixed with t.fs.Basepath (i.e. if nsPrefix has dots in it...)
-	path := t.fs.generateFilename(t.nsPrefix+t.ns, kind, t.uuidAndHash)
+	path := t.fs.generateFilename(t.ns, kind, t.uuidAndHash) + t.nsSuffix
 
 	f, err := os.Create(path)
 	if err != nil {
@@ -328,12 +327,8 @@ func (t *FSTx) Put(size int64, kind Kind, r io.Reader) error {
 }
 
 func (t *FSTx) Commit() error {
-	targetPath := t.fs.generateDir(t.ns, t.uuidAndHash)
-	fmt.Println("Making", targetPath)
-	os.MkdirAll(targetPath, os.ModePerm)
-
 	for _, k := range t.kinds {
-		from := t.fs.generateFilename(t.nsPrefix+t.ns, k, t.uuidAndHash)
+		from := t.fs.generateFilename(t.ns, k, t.uuidAndHash) + t.nsSuffix
 		to := t.fs.generateFilename(t.ns, k, t.uuidAndHash)
 
 		err := os.Rename(from, to)
@@ -342,16 +337,13 @@ func (t *FSTx) Commit() error {
 		}
 	}
 
-	// Clean up temporary dir
-
 	return nil
 }
 
 func (t *FSTx) Abort() error {
-	path := t.fs.generateDir(
-		t.nsPrefix+t.ns,
-		t.uuidAndHash,
-	)
-
-	return os.RemoveAll(path)
+	for _, k := range t.kinds {
+		from := t.fs.generateFilename(t.ns, k, t.uuidAndHash) + t.nsSuffix
+		os.Remove(from)
+	}
+	return nil
 }
