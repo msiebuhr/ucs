@@ -26,12 +26,9 @@ func TestMemoryReader(t *testing.T) {
 
 	// Put non-empty cacheline in
 	info := []byte("info")
-	cl := Line{Info: &info}
-
-	err = c.Put("mem", key, cl)
-	if err != nil {
-		t.Fatalf("Unexpected error calling Put(): %s", err)
-	}
+	tx := c.PutTransaction("mem", key)
+	tx.Put(int64(len(info)), KIND_INFO, bytes.NewReader(info))
+	tx.Commit()
 
 	// Try again
 	size, reader, err = c.Get("mem", KIND_INFO, key)
@@ -64,11 +61,13 @@ func TestMemoryquota(t *testing.T) {
 		keys[i] = make([]byte, 32)
 		rand.Read(keys[i])
 
-		cl := Line{Info: &[]byte{byte(i)}}
-		err := c.Put("mem", keys[i], cl)
+		info := []byte{byte(i)}
+		tx := c.PutTransaction("mem", keys[i])
+		err := tx.Put(int64(len(info)), KIND_INFO, bytes.NewReader(info))
 		if err != nil {
 			t.Fatalf("Unexpected error calling Put(): %s", err)
 		}
+		tx.Commit()
 
 		if c.size != int64(i)+1 {
 			t.Errorf("Expected cache size to be %d, got %d", i+1, c.size)
@@ -77,8 +76,9 @@ func TestMemoryquota(t *testing.T) {
 
 	// Put something large and check it is bumps everything else off
 	data := make([]byte, 100)
-	cl := Line{Info: &data}
-	c.Put("mem", make([]byte, 32), cl)
+	tx := c.PutTransaction("mem", make([]byte, 32))
+	tx.Put(100, KIND_INFO, bytes.NewReader(data))
+	tx.Commit()
 
 	if len(c.data) != 1 {
 		t.Errorf("Expected cache length to be 1, has %d", len(c.data))

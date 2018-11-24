@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestFSGeneratePath(t *testing.T) {
+func TestFSGenerateFilename(t *testing.T) {
 	fs, err := NewFS()
 	if err != nil {
 		t.Fatalf("Could not create FS: %s", err)
@@ -17,7 +17,7 @@ func TestFSGeneratePath(t *testing.T) {
 	for i := range key {
 		key[i] = byte(i % 256)
 	}
-	path := fs.generatePath("", KIND_INFO, key)
+	path := fs.generateFilename("", KIND_INFO, key)
 
 	// Ends with <key>.info
 	suffix := "/unity-cache/__default/00/000102030405060708090a0b0c0d0e0f-101112131415161718191a1b1c1d1e1f.info"
@@ -31,7 +31,7 @@ func TestFSGeneratePath(t *testing.T) {
 	}
 
 	// And with namespaces
-	path = fs.generatePath("NameSpace", KIND_INFO, key)
+	path = fs.generateFilename("NameSpace", KIND_INFO, key)
 
 	// Ends with <key>.info
 	suffix = "/unity-cache/NameSpace/00/000102030405060708090a0b0c0d0e0f-101112131415161718191a1b1c1d1e1f.info"
@@ -41,7 +41,7 @@ func TestFSGeneratePath(t *testing.T) {
 }
 
 func TestFSReader(t *testing.T) {
-	c, err := NewFS(func(f *FS) { f.Basepath = "./testdata"; f.Quota = 100 })
+	c, err := NewFS(func(f *FS) { f.Basepath = "./testdata/test-fs-reader/"; f.Quota = 100 })
 	if err != nil {
 		t.Fatalf("Error creating FS: %s", err)
 	}
@@ -67,12 +67,12 @@ func TestFSReader(t *testing.T) {
 
 	// Put non-empty cacheline in
 	info := []byte("info")
-	cl := Line{Info: &info}
-
-	err = c.Put("fs", key, cl)
+	tx := c.PutTransaction("fs", key)
+	err = tx.Put(int64(len(info)), KIND_INFO, bytes.NewReader(info))
 	if err != nil {
 		t.Fatalf("Unexpected error calling Put(): %s", err)
 	}
+	tx.Commit()
 
 	// Try again
 	size, reader, err = c.Get("fs", KIND_INFO, key)
@@ -97,10 +97,13 @@ func TestFSReader(t *testing.T) {
 }
 
 func TestFSQuota(t *testing.T) {
-	f, err := NewFS(func(f *FS) { f.Quota = 100; f.Basepath = "./testdata" })
+	f, err := NewFS(func(f *FS) { f.Quota = 100; f.Basepath = "./testdata/fs-quota/" })
 	if err != nil {
 		t.Fatalf("Error creating FS: %s", err)
 	}
+	defer func() {
+		os.RemoveAll(f.Basepath)
+	}()
 
 	keys := make([][]byte, 100)
 
@@ -109,11 +112,12 @@ func TestFSQuota(t *testing.T) {
 		keys[i] = make([]byte, 32)
 		rand.Read(keys[i])
 
-		cl := Line{Info: &[]byte{byte(i)}}
-		err := f.Put("fs", keys[i], cl)
+		tx := f.PutTransaction("fs", keys[i])
+		err := tx.Put(1, KIND_INFO, bytes.NewReader([]byte{byte(i)}))
 		if err != nil {
 			t.Fatalf("Unexpected error calling Put(): %s", err)
 		}
+		tx.Commit()
 
 		// Run the garbage collector explicitly
 		f.collectGarbage()
@@ -126,8 +130,9 @@ func TestFSQuota(t *testing.T) {
 
 	// Put something large and check it is bumps everything else off
 	data := make([]byte, 100)
-	cl := Line{Info: &data}
-	f.Put("fs", make([]byte, 32), cl)
+	tx := f.PutTransaction("fs", make([]byte, 32))
+	tx.Put(int64(len(data)), KIND_INFO, bytes.NewReader(data))
+	tx.Commit()
 
 	// Run GC and check size is around 100
 	f.collectGarbage()

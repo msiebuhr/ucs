@@ -201,8 +201,12 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	// Set deadline for getting data five seconds in the future
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
-	trx := make([]byte, 0)
-	trxData := cache.Line{}
+	var trx cache.Transaction
+	defer func() {
+		if trx != nil {
+			trx.Abort()
+		}
+	}()
 
 	// First, read uint32 version number
 	version, err := readVersionNumber(rw)
@@ -300,7 +304,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			ops.WithLabelValues(s.Namespace, "ts").Inc()
 
 			// Bail if we're already in a command
-			if len(trx) > 0 {
+			if trx != nil {
 				s.log(ctx, "Error starting trx inside trx")
 				return
 			}
@@ -315,7 +319,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			s.logf(ctx, "Transaction started for %s", PrettyUuidAndHash(uuidAndHash))
 
-			trx = uuidAndHash
+			trx = s.Cache.PutTransaction(s.Namespace, uuidAndHash)
 			continue
 		}
 
@@ -323,19 +327,18 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 		if cmd == 't' && cmdType == 'e' {
 			ops.WithLabelValues(s.Namespace, "te").Inc()
 
-			if len(trx) == 0 {
+			if trx == nil {
 				s.log(ctx, "Error ending trx - none started")
 				return
 			}
 
-			err := s.Cache.Put(s.Namespace, trx, trxData)
+			err := trx.Commit()
 			if err != nil {
-				s.log(ctx, "Error ending trx - cache put error:", err)
+				s.log(ctx, "Error ending trx - cache commit error:", err)
 				continue
 			}
 
-			trx = []byte{}
-			trxData = cache.Line{}
+			trx = nil
 			continue
 		}
 
@@ -365,8 +368,12 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			}
 			s.log(ctx, "Put, size", string(sizeBytes), size)
 
-			// TODO: Cache should probably have the reader embedded
-			trxData.PutReader(cache.Kind(cmdType), size, rw)
+			if trx == nil {
+				s.logf(ctx, "Error putting: Not inside transaction")
+				return
+			}
+
+			trx.Put(int64(size), cache.Kind(cmdType), rw)
 
 			putBytes.WithLabelValues(s.Namespace, string(cmdType)).Observe(float64(size))
 			putDurations.WithLabelValues(s.Namespace, string(cmdType)).Observe(time.Now().Sub(start).Seconds())

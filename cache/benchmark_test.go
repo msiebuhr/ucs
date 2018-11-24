@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -18,12 +19,10 @@ func benchmarkBackendSequentialReadBuf(b *testing.B, c Cacher, size int64) {
 	// Put non-empty cacheline in
 	info := make([]byte, size)
 	rand.Read(info)
-	cl := Line{Info: &info}
 
-	err := c.Put("bench", key, cl)
-	if err != nil {
-		b.Fatalf("Unexpected error calling Put(): %s", err)
-	}
+	tx := c.PutTransaction("bench", key)
+	tx.Put(int64(len(info)), KIND_INFO, bytes.NewReader(info))
+	tx.Commit()
 
 	b.SetBytes(size)
 	b.ResetTimer()
@@ -83,12 +82,10 @@ func BenchmarkFSPositiveStream(b *testing.B) {
 	// Put non-empty cacheline in
 	info := make([]byte, 1024)
 	rand.Read(info)
-	cl := Line{Info: &info}
 
-	err = c.Put("bench", key, cl)
-	if err != nil {
-		b.Fatalf("Unexpected error calling Put(): %s", err)
-	}
+	tx := c.PutTransaction("bench", key)
+	tx.Put(int64(len(info)), KIND_INFO, bytes.NewReader(info))
+	tx.Commit()
 
 	b.SetBytes(int64(len(info)))
 	b.ResetTimer()

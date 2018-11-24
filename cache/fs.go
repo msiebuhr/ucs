@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -43,6 +44,8 @@ type FS struct {
 	Basepath string
 	Size     int64
 	Quota    int64
+
+	transactionCout uint64
 }
 
 func NewFS(options ...func(*FS)) (*FS, error) {
@@ -182,7 +185,14 @@ func (fs *FS) collectGarbage() {
 	}
 }
 
-func (fs *FS) generatePath(ns string, kind Kind, uuidAndHash []byte) string {
+func (fs *FS) generateDir(ns string, uuidAndHash []byte) string {
+	if ns == "" {
+		ns = "__default"
+	}
+	return filepath.Join(fs.Basepath, ns, fmt.Sprintf("%02x", uuidAndHash[:1]))
+}
+
+func (fs *FS) generateFilename(ns string, kind Kind, uuidAndHash []byte) string {
 	var suffix string
 	switch kind {
 	case KIND_ASSET:
@@ -195,15 +205,14 @@ func (fs *FS) generatePath(ns string, kind Kind, uuidAndHash []byte) string {
 		suffix = ".UNKNOWN_TYPE"
 	}
 
-	if ns == "" {
-		ns = "__default"
-	}
-
-	return filepath.Join(fs.Basepath, ns, fmt.Sprintf("%02x", uuidAndHash[:1]), fmt.Sprintf("%016x-%016x.%s", uuidAndHash[:16], uuidAndHash[16:], suffix))
+	return filepath.Join(
+		fs.generateDir(ns, uuidAndHash),
+		fmt.Sprintf("%016x-%016x.%s", uuidAndHash[:16], uuidAndHash[16:], suffix),
+	)
 }
 
 func (fs *FS) putKind(ns string, kind Kind, uuidAndHash, data []byte) error {
-	path := fs.generatePath(ns, kind, uuidAndHash)
+	path := fs.generateFilename(ns, kind, uuidAndHash)
 
 	//fs.lock.Lock()
 	//defer fs.lock.Unlock()
@@ -219,46 +228,8 @@ func (fs *FS) putKind(ns string, kind Kind, uuidAndHash, data []byte) error {
 	return nil
 }
 
-func (fs *FS) Put(ns string, uuidAndHash []byte, data Line) error {
-	fs.lock.Lock()
-	defer fs.lock.Unlock()
-
-	// Kick of GC if we're above the size
-	fs.Size += data.Size()
-	fs_size.WithLabelValues(ns).Add(float64(data.Size()))
-	if fs.Size > fs.Quota {
-		go fs.collectGarbage()
-	}
-
-	// Make sure leading directory exists!
-	leadingPath := filepath.Join(fs.Basepath, ns, fmt.Sprintf("%02x", uuidAndHash[:1]))
-	os.MkdirAll(leadingPath, os.ModePerm)
-
-	// Loop over types in the Put
-	if data.Info != nil {
-		err := fs.putKind(ns, KIND_INFO, uuidAndHash, *data.Info)
-		if err != nil {
-			return err
-		}
-	}
-	if data.Resource != nil {
-		err := fs.putKind(ns, KIND_RESOURCE, uuidAndHash, *data.Resource)
-		if err != nil {
-			return err
-		}
-	}
-	if data.Asset != nil {
-		err := fs.putKind(ns, KIND_ASSET, uuidAndHash, *data.Asset)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (fs *FS) Get(ns string, kind Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
-	path := fs.generatePath(ns, kind, uuidAndHash)
+	path := fs.generateFilename(ns, kind, uuidAndHash)
 
 	fs.lock.RLock()
 	defer fs.lock.RUnlock()
@@ -276,4 +247,65 @@ func (fs *FS) Get(ns string, kind Kind, uuidAndHash []byte) (int64, io.ReadClose
 	}
 
 	return stat.Size(), f, nil
+}
+
+func (fs *FS) PutTransaction(ns string, uuidAndHash []byte) Transaction {
+	count := atomic.AddUint64(&fs.transactionCout, 1)
+	return &FSTx{
+		fs:          fs,
+		ns:          ns,
+		nsSuffix:    fmt.Sprintf(".tx-%010d", count),
+		uuidAndHash: uuidAndHash,
+		kinds:       []Kind{},
+	}
+}
+
+type FSTx struct {
+	fs          *FS
+	ns          string
+	nsSuffix    string
+	uuidAndHash []byte
+
+	// Track what kinds have been uploaded
+	kinds []Kind
+}
+
+func (t *FSTx) Put(size int64, kind Kind, r io.Reader) error {
+	t.kinds = append(t.kinds, kind)
+	// Make sure leading directory exists!
+	leadingPath := t.fs.generateDir(t.ns, t.uuidAndHash)
+	os.MkdirAll(leadingPath, os.ModePerm)
+
+	path := t.fs.generateFilename(t.ns, kind, t.uuidAndHash) + t.nsSuffix
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, r)
+	return err
+}
+
+func (t *FSTx) Commit() error {
+	for _, k := range t.kinds {
+		from := t.fs.generateFilename(t.ns, k, t.uuidAndHash) + t.nsSuffix
+		to := t.fs.generateFilename(t.ns, k, t.uuidAndHash)
+
+		err := os.Rename(from, to)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (t *FSTx) Abort() error {
+	for _, k := range t.kinds {
+		from := t.fs.generateFilename(t.ns, k, t.uuidAndHash) + t.nsSuffix
+		os.Remove(from)
+	}
+	return nil
 }
