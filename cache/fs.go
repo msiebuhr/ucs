@@ -211,23 +211,6 @@ func (fs *FS) generateFilename(ns string, kind Kind, uuidAndHash []byte) string 
 	)
 }
 
-func (fs *FS) putKind(ns string, kind Kind, uuidAndHash, data []byte) error {
-	path := fs.generateFilename(ns, kind, uuidAndHash)
-
-	//fs.lock.Lock()
-	//defer fs.lock.Unlock()
-
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	f.Write(data)
-
-	return nil
-}
-
 func (fs *FS) Get(ns string, kind Kind, uuidAndHash []byte) (int64, io.ReadCloser, error) {
 	path := fs.generateFilename(ns, kind, uuidAndHash)
 
