@@ -61,17 +61,38 @@ func NewFS(options ...func(*FS)) (*FS, error) {
 	}
 	fs.Basepath = path
 
-	// Kick off GC so we can get proper sizing info
-	go fs.collectGarbage()
+	// Kick off an initial GC, so we can get proper sizing info
+	go fs.collectGarbageOnce()
 
 	return fs, nil
+}
+
+func (fs *FS) collectGarbage() {
+	var lastSize int64 = -1
+
+	for {
+		fs.lock.Lock()
+		size := fs.Size
+		quota := fs.Quota
+		fs.lock.Unlock()
+
+		if size <= quota {
+			return
+		}
+		// Did we make any progress?
+		if lastSize == size {
+			return
+		}
+
+		fs.collectGarbageOnce()
+	}
 }
 
 // Remove old files (as measured by the most recent ATIME of any entry sharing
 // the same UUID/hash)
 // Also re-calculates the total size of cache directory, now we're at scanning
 // everything anyway...
-func (fs *FS) collectGarbage() {
+func (fs *FS) collectGarbageOnce() {
 	// Report quota up front
 	fs_quota.Set(float64(fs.Quota))
 
@@ -87,13 +108,11 @@ func (fs *FS) collectGarbage() {
 	// Find all namespaces
 	dir, err := os.Open(fs.Basepath)
 	if err != nil {
-		//fs.Log.Printf("GC error: %s", err)
 		return
 	}
 
 	entries, err := dir.Readdir(0)
 	if err != nil {
-		//fs.log.Printf("GC error: %s", err)
 		return
 	}
 
@@ -165,11 +184,13 @@ func (fs *FS) collectGarbage() {
 			continue
 		}
 
-		path := filepath.Join(fs.Basepath, old[i].ns, fmt.Sprintf("%02x", i), old[i].uuidAndHash)
+		path := filepath.Join(fs.Basepath, old[i].ns, old[i].uuidAndHash[:2], old[i].uuidAndHash)
 
 		err := os.Remove(path)
 		if err == nil {
-			fs_gc_bytes.Add(float64(old[i].size))
+			size := float64(old[i].size)
+			fs_gc_bytes.Add(size)
+			fs_size.WithLabelValues(old[i].ns).Sub(size)
 			fs.Size -= old[i].size
 		}
 
@@ -177,11 +198,6 @@ func (fs *FS) collectGarbage() {
 		if fs.Size <= fs.Quota {
 			return
 		}
-	}
-
-	// If we're still over quota, do another round of GC'ing
-	if fs.Size > fs.Quota {
-		go fs.collectGarbage()
 	}
 }
 
@@ -251,6 +267,7 @@ type FSTx struct {
 
 	// Track what kinds have been uploaded
 	kinds []Kind
+	size  int64
 }
 
 func (t *FSTx) Put(size int64, kind Kind, r io.Reader) error {
@@ -266,6 +283,7 @@ func (t *FSTx) Put(size int64, kind Kind, r io.Reader) error {
 		return err
 	}
 	defer f.Close()
+	t.size += size
 
 	_, err = io.Copy(f, r)
 	return err
@@ -281,6 +299,11 @@ func (t *FSTx) Commit() error {
 			return err
 		}
 	}
+
+	t.fs.lock.Lock()
+	t.fs.Size += t.size
+	t.fs.lock.Unlock()
+	t.fs.collectGarbage()
 
 	return nil
 }

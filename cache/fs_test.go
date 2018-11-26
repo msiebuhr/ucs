@@ -136,7 +136,7 @@ func TestFSQuota(t *testing.T) {
 
 	// Run GC and check size is around 100
 	f.collectGarbage()
-	//if len(n.data) != 1 {
-	//	t.Errorf("Expected cache length to be 1, has %d", len(c.data))
-	//}
+	if f.Size != 100 {
+		t.Errorf("Expected cache size to be 100, has %d", f.Size)
+	}
 }
