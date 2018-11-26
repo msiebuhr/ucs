@@ -231,13 +231,24 @@ func BenchmarkServers(b *testing.B) {
 		"FS":     fs,
 	}
 
+	sizes := map[string]int64{
+		"1Kb":    1024,
+		"128 Kb": 1024 * 128,
+		"1Mb":    1024 * 1024,
+		"128 Mb": 1024 * 1024 * 128,
+	}
+
 	for name, backend := range backends {
 		b.Run(name, func(b *testing.B) {
-			s := NewServer(
-				func(s *Server) { s.Cache = backend },
-			)
-			defer s.Stop()
-			HelpBenchmarkServerGets(b, s, 1024*1024)
+			for sizeName, byteCount := range sizes {
+				b.Run(sizeName, func(b *testing.B) {
+					s := NewServer(
+						func(s *Server) { s.Cache = backend },
+					)
+					defer s.Stop()
+					HelpBenchmarkServerGets(b, s, byteCount)
+				})
+			}
 		})
 	}
 }
