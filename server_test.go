@@ -216,31 +216,30 @@ func TestGACachePutAndGetKeyWithUTF8(t *testing.T) {
 }
 
 // Quick benchmarking
-func BenchmarkMemory1mb(b *testing.B) {
-	s := NewServer(
-	//func (l *Server) {l.Log = log.New(os.Stdout, "", 0)}
+func BenchmarkServers(b *testing.B) {
+	fs, _ := cache.NewFS(
+		func(s *cache.FS) { s.Quota = 1024 * 1024 * 1024 },
+		func(s *cache.FS) { s.Basepath = "./testdata/bench" },
 	)
-	defer s.Stop()
-
-	HelpBenchmarkServerGets(b, s, 1024*1024)
-}
-
-func BenchmarkFS1mb(b *testing.B) {
-	c, err := cache.NewFS(func(f *cache.FS) { f.Basepath = "./testdata" })
-	if err != nil {
-		b.Fatalf("Error creating FS: %s", err)
-	}
-
 	defer func() {
-		os.RemoveAll(c.Basepath)
+		os.RemoveAll(fs.Basepath)
 	}()
 
-	s := NewServer(
-		//func (l *Server) {l.Log = log.New(os.Stdout, "", 0)}
-		func(s *Server) { s.Cache = c },
-	)
+	backends := map[string]cache.Cacher{
+		"NOP":    &cache.NOP{},
+		"Memory": cache.NewMemory(1024 * 1024 * 1024),
+		"FS":     fs,
+	}
 
-	HelpBenchmarkServerGets(b, s, 1024*1024)
+	for name, backend := range backends {
+		b.Run(name, func(b *testing.B) {
+			s := NewServer(
+				func(s *Server) { s.Cache = backend },
+			)
+			defer s.Stop()
+			HelpBenchmarkServerGets(b, s, 1024*1024)
+		})
+	}
 }
 
 func HelpBenchmarkServerGets(b *testing.B, s *Server, size int64) {
