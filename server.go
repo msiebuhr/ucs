@@ -373,7 +373,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 				return
 			}
 
-			trx.Put(int64(size), cache.Kind(cmdType), rw)
+			trx.Put(int64(size), cache.Kind(cmdType), io.LimitReader(rw, int64(size)))
 
 			putBytes.WithLabelValues(s.Namespace, string(cmdType)).Observe(float64(size))
 			putDurations.WithLabelValues(s.Namespace, string(cmdType)).Observe(time.Now().Sub(start).Seconds())
