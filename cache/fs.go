@@ -305,6 +305,8 @@ func (t *FSTx) Commit() error {
 	t.fs.lock.Unlock()
 	t.fs.collectGarbage()
 
+	fs_size.WithLabelValues(t.ns).Add(float64(t.size))
+
 	return nil
 }
 
