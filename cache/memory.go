@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -28,11 +29,11 @@ func init() {
 
 type memoryEntry struct {
 	data       map[Kind][]byte
-	generation int
+	generation uint64
 	size       int64
 }
 
-func newMemoryEntry(generation int) memoryEntry {
+func newMemoryEntry(generation uint64) memoryEntry {
 	return memoryEntry{
 		generation: generation,
 		data:       make(map[Kind][]byte),
@@ -40,7 +41,7 @@ func newMemoryEntry(generation int) memoryEntry {
 	}
 }
 
-func memoryEntryFromLine(generation int, line Line) memoryEntry {
+func memoryEntryFromLine(generation uint64, line Line) memoryEntry {
 	m := newMemoryEntry(generation)
 
 	if data, ok := line.Get(KIND_ASSET); ok {
@@ -73,7 +74,7 @@ type Memory struct {
 	quota int64
 
 	// Monotonically increasing counter to track age of objects
-	generation int
+	generation uint64
 }
 
 func NewMemory(quota int64) *Memory {
@@ -118,8 +119,7 @@ func (c *Memory) Get(ns string, kind Kind, uuidAndHash []byte) (int64, io.ReadCl
 	}
 
 	if data, ok := line.data[kind]; ok {
-		c.generation++
-		line.generation = c.generation
+		line.generation = atomic.AddUint64(&c.generation, 1)
 
 		return int64(len(data)), ioutil.NopCloser(bytes.NewReader(data)), nil
 	}
@@ -128,14 +128,12 @@ func (c *Memory) Get(ns string, kind Kind, uuidAndHash []byte) (int64, io.ReadCl
 }
 
 func (m *Memory) PutTransaction(ns string, uuidAndHash []byte) Transaction {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-
+	generation := atomic.AddUint64(&m.generation, 1)
 	return &MemoryTx{
 		mem:         m,
 		ns:          ns,
 		uuidAndHash: uuidAndHash,
-		entry:       newMemoryEntry(m.generation),
+		entry:       newMemoryEntry(generation),
 	}
 }
 
@@ -160,9 +158,6 @@ func (t *MemoryTx) Put(size int64, kind Kind, r io.Reader) error {
 func (t *MemoryTx) Commit() error {
 	t.mem.lock.Lock()
 	defer t.mem.lock.Unlock()
-	t.mem.generation++
-
-	t.entry.generation = t.mem.generation
 
 	t.mem.collectGarbage(t.entry.size)
 
