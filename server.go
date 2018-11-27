@@ -40,7 +40,7 @@ var (
 	}, []string{"namespace", "type"})
 	putDurations = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Name: "ucs_server_put_duration_seconds",
-		Help: "Time spent recieving data",
+		Help: "Time spent receiving data",
 	}, []string{"namespace", "type"})
 )
 
@@ -232,9 +232,9 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 		conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 		// Flush version or previous command
-		// The original server get really confused if clients do agressive
-		// streaming. Explicitly waiting for output from previous command
-		// seem to make it happy...
+		// The original server get really confused if clients do aggressive
+		// streaming. Explicitly waiting for output from previous command seem
+		// to make it happy...
 		rw.Flush()
 
 		cmd, err := rw.ReadByte()
