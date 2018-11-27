@@ -1,0 +1,14 @@
+[Unit]
+    Description=Unity Cache Server
+
+[Service]
+    Type=simple
+    SyslogIdentifier=UCS
+    TimeoutStartSec=300
+    ExecStart=/usr/local/bin/ucs
+    EnvironmentFile=/etc/ucs.conf
+    Restart=on-failure
+    User=unitycacheserver
+
+[Install]
+    WantedBy=multi-user.target
