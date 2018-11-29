@@ -13,11 +13,25 @@ import (
 
 	"github.com/msiebuhr/ucs"
 	"github.com/msiebuhr/ucs/cache"
+	"github.com/msiebuhr/ucs/customflags"
 
+	"github.com/docker/go-units"
 	"github.com/namsral/flag"
 	"github.com/pinterest/bender"
 	"github.com/pinterest/bender/hist"
 )
+
+func PutRandom(s int64) *ucs.PutObject {
+	reader := io.LimitReader(
+		rand.New(rand.NewSource(s)),
+		s,
+	)
+
+	return ucs.NewPutObject(
+		reader,
+		int(s),
+	)
+}
 
 // Generate synthetic cache requests.
 //
@@ -26,7 +40,7 @@ import (
 // availability). Then when Unity has figured out what assets it needs, another
 // connection is opened up, which requests all the assets. Finally, if any
 // assets were missing, a connection to upload these after they've been built locally.
-func SyntheticCacheRequests(n int) chan interface{} {
+func SyntheticCacheRequests(n int, commands int, size int64) chan interface{} {
 	c := make(chan interface{}, 100)
 
 	guidAndHash := make([]byte, 32)
@@ -41,7 +55,7 @@ func SyntheticCacheRequests(n int) chan interface{} {
 				// No requests -- just a cache-aliveness request
 			case 1:
 				// Tonnes of GET-requests
-				for j := 0; j < 10; j++ {
+				for j := 0; j < commands; j++ {
 					guidAndHash[0] = byte(i + j)
 					reqs = append(
 						reqs,
@@ -51,11 +65,16 @@ func SyntheticCacheRequests(n int) chan interface{} {
 				}
 			case 2:
 				// Put-requests
-				for j := 0; j < 10; j++ {
+				for j := 0; j < commands; j++ {
 					guidAndHash[0] = byte(i + j)
 					reqs = append(
 						reqs,
-						ucs.Put(guidAndHash, ucs.PutString("info"), ucs.PutString("asset"), nil),
+						ucs.Put(
+							guidAndHash,
+							ucs.PutString("info"),
+							PutRandom(size), // Asset
+							nil,
+						),
 					)
 				}
 			}
@@ -125,18 +144,34 @@ var (
 	requestCount int
 	workerCount  int
 	verbose      bool
+	commandCount int
+	size         = customflags.NewSize(1024 * 1024)
 )
 
 func init() {
 	flag.BoolVar(&verbose, "verbose", false, "Spew more info")
 	flag.IntVar(&requestCount, "requests", 100, "Total number of requests")
 	flag.IntVar(&workerCount, "workers", 10, "Worker number")
+	flag.IntVar(&commandCount, "commands", 100, "Commands executed per request")
+	flag.Var(size, "size", "Request blob size")
 }
 
 func main() {
 	flag.Parse()
 
-	requests := SyntheticCacheRequests(requestCount)
+	log.Println("Starting")
+	log.Println(
+		"Starting",
+		"Requests=", requestCount,
+		"Workers=", workerCount,
+		"Commands/request=", commandCount,
+		"AssetSize=", size,
+	)
+	log.Println(
+		"Est. total upload=", units.BytesSize(float64((requestCount/3)*commandCount*int(size.Int64()))),
+	)
+
+	requests := SyntheticCacheRequests(requestCount, commandCount, size.Int64())
 	exec := CacheExecutor
 	recorder := make(chan interface{}, requestCount)
 

@@ -102,12 +102,19 @@ type PutObject struct {
 	size int
 }
 
+func NewPutObject(r io.Reader, size int) *PutObject {
+	return &PutObject{
+		r:    r,
+		size: size,
+	}
+}
+
 // PUT string wrapper
 func PutString(s string) *PutObject {
-	return &PutObject{
-		r:    strings.NewReader(s),
-		size: len([]byte(s)), // Length in bytes?
-	}
+	return NewPutObject(
+		strings.NewReader(s),
+		len([]byte(s)),
+	)
 }
 
 type PutRequest struct {
