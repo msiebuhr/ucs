@@ -20,29 +20,41 @@ var (
 		Name: "ucs_memorycache_gc_removed_bytes",
 		Help: "Bytes deleted by GC",
 	})
+	memory_size = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ucs_memorycache_size_bytes",
+		Help: "Size of cache in bytes",
+	}, []string{"namespace"})
+	memory_quota = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ucs_memorycache_quota_bytes",
+		Help: "Size of quota in bytes",
+	})
 )
 
 func init() {
 	prometheus.MustRegister(memory_gc_duration)
 	prometheus.MustRegister(memory_gc_bytes)
+	prometheus.MustRegister(memory_size)
+	prometheus.MustRegister(memory_quota)
 }
 
 type memoryEntry struct {
 	data       map[Kind][]byte
+	ns         string
 	generation uint64
 	size       int64
 }
 
-func newMemoryEntry(generation uint64) memoryEntry {
+func newMemoryEntry(ns string, generation uint64) memoryEntry {
 	return memoryEntry{
 		generation: generation,
+		ns:         ns,
 		data:       make(map[Kind][]byte),
 		size:       0,
 	}
 }
 
-func memoryEntryFromLine(generation uint64, line Line) memoryEntry {
-	m := newMemoryEntry(generation)
+func memoryEntryFromLine(ns string, generation uint64, line Line) memoryEntry {
+	m := newMemoryEntry(ns, generation)
 
 	if data, ok := line.Get(KIND_ASSET); ok {
 		m.data[KIND_ASSET] = data
@@ -78,6 +90,7 @@ type Memory struct {
 }
 
 func NewMemory(quota int64) *Memory {
+	memory_quota.Set(float64(quota))
 	return &Memory{quota: quota, data: make(map[string]memoryEntry)}
 }
 
@@ -104,6 +117,7 @@ func (m *Memory) collectGarbage(spaceToMake int64) {
 		// Decrement size and remove key
 		m.size -= m.data[oldestKey].size
 		memory_gc_bytes.Add(float64(m.data[oldestKey].size))
+		memory_size.WithLabelValues(m.data[oldestKey].ns).Add(-1 * float64(m.data[oldestKey].size))
 		delete(m.data, oldestKey)
 	}
 }
@@ -133,7 +147,7 @@ func (m *Memory) PutTransaction(ns string, uuidAndHash []byte) Transaction {
 		mem:         m,
 		ns:          ns,
 		uuidAndHash: uuidAndHash,
-		entry:       newMemoryEntry(generation),
+		entry:       newMemoryEntry(ns, generation),
 	}
 }
 
@@ -160,6 +174,7 @@ func (t *MemoryTx) Commit() error {
 	defer t.mem.lock.Unlock()
 
 	t.mem.collectGarbage(t.entry.size)
+	memory_size.WithLabelValues(t.ns).Add(float64(t.entry.size))
 
 	t.mem.data[t.ns+string(t.uuidAndHash)] = t.entry
 	t.mem.size += t.entry.size
