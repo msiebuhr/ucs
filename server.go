@@ -22,6 +22,7 @@ var (
 		Name: "ucs_server_ops",
 		Help: "Operations performed on the server",
 	}, []string{"namespace", "op"})
+	// Technically not needed, as `getBytes_sum / ops{op="g"}` would produce ca. same results
 	getCacheHit = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "ucs_server_get_hits",
 		Help: "Hit/miss upon get'ing from the cache",
@@ -104,6 +105,19 @@ func (s *Server) Listener(ctx context.Context, listener *net.TCPListener) error 
 	// Enrich context with current namespace
 	if s.Namespace != "" {
 		ctx = context.WithValue(ctx, "namespace", s.Namespace)
+	}
+
+	// Initialize metrics with given labels
+	for _, op := range []string{"g", "p", "ts", "te"} {
+		ops.WithLabelValues(s.Namespace, op)
+	}
+	for _, kind := range []string{string(cache.KIND_ASSET), string(cache.KIND_INFO), string(cache.KIND_RESOURCE)} {
+		getCacheHit.WithLabelValues(s.Namespace, (kind), "hit")
+		getCacheHit.WithLabelValues(s.Namespace, (kind), "miss")
+		getBytes.WithLabelValues(s.Namespace, (kind))
+		getDurations.WithLabelValues(s.Namespace, (kind))
+		putBytes.WithLabelValues(s.Namespace, (kind))
+		putDurations.WithLabelValues(s.Namespace, (kind))
 	}
 
 	for {
