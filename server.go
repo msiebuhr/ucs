@@ -212,7 +212,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 	defer rw.Flush()
 
-	// Set deadline for getting data five seconds in the future
+	// Set 30s deadline for getting handshake done
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	var trx cache.Transaction
@@ -242,8 +242,8 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	fmt.Fprintf(rw, "%08x", version)
 
 	for {
-		// Extend Read-dealine by five seconds for each command we process
-		conn.SetDeadline(time.Now().Add(30 * time.Second))
+		// Extend Read-dealine by five minutes for each command we process
+		conn.SetDeadline(time.Now().Add(5 * time.Minute))
 
 		// Flush version or previous command
 		// The original server get really confused if clients do aggressive
