@@ -241,15 +241,12 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	s.logf(ctx, "Got client version %d", version)
 	fmt.Fprintf(rw, "%08x", version)
 
+	// Flush version, so client will begin sending data
+	rw.Flush()
+
 	for {
 		// Extend Read-dealine by five minutes for each command we process
 		conn.SetDeadline(time.Now().Add(5 * time.Minute))
-
-		// Flush version or previous command
-		// The original server get really confused if clients do aggressive
-		// streaming. Explicitly waiting for output from previous command seem
-		// to make it happy...
-		rw.Flush()
 
 		cmd, err := rw.ReadByte()
 		if err == io.EOF {
