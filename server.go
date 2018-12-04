@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -140,9 +141,9 @@ func (s *Server) Listener(ctx context.Context, listener *net.TCPListener) error 
 			s.log(ctx, "Error accepting: ", err.Error())
 			continue
 		}
-		s.log(ctx, "connected")
 		//s.waitGroup.Add(1)
 		connCtx := context.WithValue(ctx, "addr", conn.RemoteAddr().String())
+		s.log(connCtx, "Connected")
 		go s.handleRequest(connCtx, conn)
 	}
 }
@@ -200,12 +201,23 @@ func readVersionNumber(rw *bufio.ReadWriter) (uint32, error) {
 	return uint32(n), err
 }
 
+func newReadCloserFmt(format string, args ...interface{}) io.ReadCloser {
+	return ioutil.NopCloser(
+		strings.NewReader(
+			fmt.Sprintf(format, args...),
+		),
+	)
+}
+
 // Handles incoming requests.
 func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	s.waitGroup.Add(1)
 	start := time.Now()
+	readerAndWriterDone := sync.WaitGroup{}
+
 	defer func() {
 		s.log(ctx, "Closing connection")
+		readerAndWriterDone.Wait()
 		conn.Close()
 		s.waitGroup.Done()
 	}()
@@ -243,6 +255,31 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 	// Flush version, so client will begin sending data
 	rw.Flush()
+
+	data := make(chan io.ReadCloser, 10240)
+	errors := make(chan error)
+	defer close(data)
+
+	go func() {
+		defer close(errors)
+		readerAndWriterDone.Add(1)
+		defer readerAndWriterDone.Done()
+		for reader := range data {
+			s.logf(ctx, "Sending data %+v", reader)
+			_, err := io.Copy(conn, reader)
+			if err != nil {
+				errors <- err
+				return
+			}
+			reader.Close()
+		}
+	}()
+
+	go func(errors chan error) {
+		for err := range errors {
+			fmt.Println(err)
+		}
+	}(errors)
 
 	for {
 		// Extend Read-dealine by five minutes for each command we process
@@ -288,22 +325,21 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			if err != nil {
 				getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "miss").Inc()
 				s.log(ctx, "Error reading from cache:", err)
-				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
+				data <- newReadCloserFmt("-%c%s", cmdType, uuidAndHash)
 				continue
 			}
 			if size == 0 {
 				getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "miss").Inc()
 				s.log(ctx, "Cache miss")
-				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
+				data <- newReadCloserFmt("-%c%s", cmdType, uuidAndHash)
 				if reader != nil {
 					reader.Close()
 				}
 				continue
 			}
 
-			fmt.Fprintf(rw, "+%c%016x%s", cmdType, size, uuidAndHash)
-			io.Copy(rw, reader)
-			reader.Close()
+			data <- newReadCloserFmt("+%c%016x%s", cmdType, size, uuidAndHash)
+			data <- reader
 			getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "hit").Inc()
 			getBytes.WithLabelValues(s.Namespace, string(cmdType)).Observe(float64(size))
 			getDurations.WithLabelValues(s.Namespace, string(cmdType)).Observe(time.Now().Sub(start).Seconds())
