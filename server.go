@@ -273,7 +273,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 		readerAndWriterDone.Add(1)
 		defer readerAndWriterDone.Done()
 		for reader := range data {
-			s.logf(ctx, "Sending data %+v", reader)
+			s.logf(ctx, "Sending data reader=%+v", reader)
 			_, err := io.Copy(conn, reader)
 			if err != nil {
 				errors <- err
@@ -315,7 +315,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			s.log(ctx, "Error reading command type:", err)
 			return
 		}
-		s.logf(ctx, "Got command '%c'/'%c'", cmd, cmdType)
+		s.logf(ctx, "Got command op=%c kind=%c", cmd, cmdType)
 
 		start = time.Now()
 
@@ -327,18 +327,21 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			uuidAndHash := make([]byte, 32)
 			_, err := io.ReadFull(rw, uuidAndHash)
 
-			s.logf(ctx, "Get '%c' '%s'", cmdType, PrettyUuidAndHash(uuidAndHash))
-
 			size, reader, err := s.Cache.Get(s.Namespace, cache.Kind(cmdType), uuidAndHash)
+			s.logf(
+				ctx,
+				"Get kind=%c uuidAndHash=%s size=%d err=%v hit=%t",
+				cmdType, PrettyUuidAndHash(uuidAndHash), size, err, size > 0 && err == nil,
+			)
+
 			if err != nil {
 				getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "miss").Inc()
-				s.log(ctx, "Error reading from cache:", err)
+				s.log(ctx, "Get error:", err)
 				data <- newReadCloserFmt("-%c%s", cmdType, uuidAndHash)
 				continue
 			}
 			if size == 0 {
 				getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "miss").Inc()
-				s.log(ctx, "Cache miss")
 				data <- newReadCloserFmt("-%c%s", cmdType, uuidAndHash)
 				if reader != nil {
 					reader.Close()
@@ -360,7 +363,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			// Bail if we're already in a command
 			if trx != nil {
-				s.log(ctx, "Error starting trx inside trx")
+				s.log(ctx, "Transaction start error: Already in transaction")
 				return
 			}
 
@@ -372,7 +375,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 				return
 			}
 
-			s.logf(ctx, "Transaction started for %s", PrettyUuidAndHash(uuidAndHash))
+			s.logf(ctx, "Transaction start uuidAndHash=%s", PrettyUuidAndHash(uuidAndHash))
 
 			trx = s.Cache.PutTransaction(s.Namespace, uuidAndHash)
 			continue
@@ -383,15 +386,17 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			ops.WithLabelValues(s.Namespace, "te").Inc()
 
 			if trx == nil {
-				s.log(ctx, "Error ending trx - none started")
+				s.log(ctx, "Transaction end error: None started")
 				return
 			}
 
 			err := trx.Commit()
 			if err != nil {
-				s.log(ctx, "Error ending trx - cache commit error:", err)
+				s.log(ctx, "Transaction end error: Commit failed:", err)
 				continue
 			}
+
+			s.log(ctx, "Transaction end")
 
 			trx = nil
 			continue
@@ -403,7 +408,12 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			// Bail on wrong CMD-types
 			if cmdType != 'a' && cmdType != 'i' && cmdType != 'r' {
-				s.logf(ctx, "Error putting - invalid type %s", []byte{cmdType})
+				s.logf(ctx, "Put error: invalid type '%s'", []byte{cmdType})
+				return
+			}
+
+			if trx == nil {
+				s.logf(ctx, "Put error: Not inside transaction")
 				return
 			}
 
@@ -411,22 +421,17 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			sizeBytes := make([]byte, 16)
 			_, err := io.ReadFull(rw, sizeBytes)
 			if err != nil {
-				s.log(ctx, "Error putting - cannot read size:", err)
+				s.log(ctx, "Put error: cannot read size:", err)
 				return
 			}
 
 			// Parse size
 			size, err := strconv.ParseUint(string(sizeBytes), 16, 64)
 			if err != nil {
-				s.logf(ctx, "Error putting - cannot parse size '%x': %s", sizeBytes, err)
+				s.logf(ctx, "Put error: cannot parse size '%x': %s", sizeBytes, err)
 				return
 			}
-			s.log(ctx, "Put, size", string(sizeBytes), size)
-
-			if trx == nil {
-				s.logf(ctx, "Error putting: Not inside transaction")
-				return
-			}
+			s.logf(ctx, "Put kind=%c size=%d", cmdType, size)
 
 			trx.Put(int64(size), cache.Kind(cmdType), io.LimitReader(rw, int64(size)))
 
