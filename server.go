@@ -256,6 +256,14 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	// Flush version, so client will begin sending data
 	rw.Flush()
 
+	// Now that we've done a handshake (and sent it), we begin doing async
+	// reading/writing, as the Unity editor wants to send *all* its
+	// get-requests before listening for responses.
+
+	// TODO: Worst case, this queue will result in 10240 open files, which
+	// probably won't work terriby well.
+	//
+	// We could have just the file we're working on open for reading
 	data := make(chan io.ReadCloser, 10240)
 	errors := make(chan error)
 	defer close(data)
