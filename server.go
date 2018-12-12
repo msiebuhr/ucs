@@ -9,7 +9,6 @@ import (
 	"log"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -201,12 +200,56 @@ func readVersionNumber(rw *bufio.ReadWriter) (uint32, error) {
 	return uint32(n), err
 }
 
-func newReadCloserFmt(format string, args ...interface{}) io.ReadCloser {
-	return ioutil.NopCloser(
-		strings.NewReader(
-			fmt.Sprintf(format, args...),
-		),
-	)
+type serverGetRequest struct {
+	kind        cache.Kind
+	uuidAndHash []byte
+}
+
+// Responds to Get requests queued up in the reqs-channel.
+func (s *Server) respondToGetRequests(ctx context.Context, w io.Writer, reqs chan *serverGetRequest) error {
+	var start time.Time
+
+	for req := range reqs {
+		start = time.Now()
+		size, reader, err := s.Cache.Get(s.Namespace, req.kind, req.uuidAndHash)
+		s.logf(
+			ctx,
+			"Get kind=%c uuidAndHash=%s size=%d err=%v hit=%t",
+			req.kind, PrettyUuidAndHash(req.uuidAndHash), size, err, size > 0 && err == nil,
+		)
+
+		// Treat internal errors as MISS
+		if err != nil {
+			s.log(ctx, "Error getting from cache:", err)
+		}
+
+		if err != nil || size == 0 {
+			getCacheHit.WithLabelValues(s.Namespace, string(req.kind), "miss").Inc()
+			_, err = fmt.Fprintf(w, "-%c%s", req.kind, req.uuidAndHash)
+			if err != nil {
+				return err
+			}
+			if reader != nil {
+				reader.Close()
+			}
+			continue
+		}
+
+		// Everything's A-OK
+		_, err = fmt.Fprintf(w, "+%c%016x%s", req.kind, size, req.uuidAndHash)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(w, reader)
+		if err != nil {
+			return err
+		}
+		reader.Close()
+		getCacheHit.WithLabelValues(s.Namespace, string(req.kind), "hit").Inc()
+		getBytes.WithLabelValues(s.Namespace, string(req.kind)).Observe(float64(size))
+		getDurations.WithLabelValues(s.Namespace, string(req.kind)).Observe(time.Now().Sub(start).Seconds())
+	}
+	return nil
 }
 
 // Handles incoming requests.
@@ -214,9 +257,11 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	s.waitGroup.Add(1)
 	start := time.Now()
 	readerAndWriterDone := sync.WaitGroup{}
+	getRequests := make(chan *serverGetRequest, 100000)
 
 	defer func() {
 		s.log(ctx, "Closing connection")
+		close(getRequests)
 		readerAndWriterDone.Wait()
 		conn.Close()
 		s.waitGroup.Done()
@@ -259,35 +304,13 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	// Now that we've done a handshake (and sent it), we begin doing async
 	// reading/writing, as the Unity editor wants to send *all* its
 	// get-requests before listening for responses.
-
-	// TODO: Worst case, this queue will result in 10240 open files, which
-	// probably won't work terriby well.
-	//
-	// We could have just the file we're working on open for reading
-	data := make(chan io.ReadCloser, 10240)
-	errors := make(chan error)
-	defer close(data)
-
-	go func() {
-		defer close(errors)
-		readerAndWriterDone.Add(1)
+	readerAndWriterDone.Add(1)
+	go func(reqs chan *serverGetRequest) {
 		defer readerAndWriterDone.Done()
-		for reader := range data {
-			s.logf(ctx, "Sending data reader=%+v", reader)
-			_, err := io.Copy(conn, reader)
-			if err != nil {
-				errors <- err
-				return
-			}
-			reader.Close()
-		}
-	}()
 
-	go func(errors chan error) {
-		for err := range errors {
-			fmt.Println(err)
-		}
-	}(errors)
+		sendError := s.respondToGetRequests(ctx, conn, reqs)
+		s.logf(ctx, "Done sending data err=%s", sendError)
+	}(getRequests)
 
 	for {
 		// Extend Read-dealine by five minutes for each command we process
@@ -326,34 +349,16 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			// Read uuidAndHash
 			uuidAndHash := make([]byte, 32)
 			_, err := io.ReadFull(rw, uuidAndHash)
-
-			size, reader, err := s.Cache.Get(s.Namespace, cache.Kind(cmdType), uuidAndHash)
-			s.logf(
-				ctx,
-				"Get kind=%c uuidAndHash=%s size=%d err=%v hit=%t",
-				cmdType, PrettyUuidAndHash(uuidAndHash), size, err, size > 0 && err == nil,
-			)
-
 			if err != nil {
-				getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "miss").Inc()
-				s.log(ctx, "Get error:", err)
-				data <- newReadCloserFmt("-%c%s", cmdType, uuidAndHash)
-				continue
-			}
-			if size == 0 {
-				getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "miss").Inc()
-				data <- newReadCloserFmt("-%c%s", cmdType, uuidAndHash)
-				if reader != nil {
-					reader.Close()
-				}
-				continue
+				s.logf(ctx, "Error reading: %s", err)
 			}
 
-			data <- newReadCloserFmt("+%c%016x%s", cmdType, size, uuidAndHash)
-			data <- reader
-			getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "hit").Inc()
-			getBytes.WithLabelValues(s.Namespace, string(cmdType)).Observe(float64(size))
-			getDurations.WithLabelValues(s.Namespace, string(cmdType)).Observe(time.Now().Sub(start).Seconds())
+			s.logf(ctx, "Get request parsed kind=%c uuidAndHash=%s", cmdType, PrettyUuidAndHash(uuidAndHash))
+			getRequests <- &serverGetRequest{
+				kind:        cache.Kind(cmdType),
+				uuidAndHash: uuidAndHash,
+			}
+
 			continue
 		}
 
