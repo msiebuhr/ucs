@@ -80,7 +80,7 @@ func TestGACacheMiss(t *testing.T) {
 	go s.handleRequest(context.Background(), server)
 
 	request := fmt.Sprintf("%08xga%016s%016sq", 0xfe, "dead", "beef")
-	go client.Write([]byte(request))
+	client.Write([]byte(request))
 
 	out, err := ioutil.ReadAll(client)
 	if err != nil {

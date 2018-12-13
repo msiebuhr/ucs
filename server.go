@@ -140,9 +140,9 @@ func (s *Server) Listener(ctx context.Context, listener *net.TCPListener) error 
 			s.log(ctx, "Error accepting: ", err.Error())
 			continue
 		}
-		s.log(ctx, "connected")
 		//s.waitGroup.Add(1)
 		connCtx := context.WithValue(ctx, "addr", conn.RemoteAddr().String())
+		s.log(connCtx, "Connected")
 		go s.handleRequest(connCtx, conn)
 	}
 }
@@ -200,19 +200,76 @@ func readVersionNumber(rw *bufio.ReadWriter) (uint32, error) {
 	return uint32(n), err
 }
 
+type serverGetRequest struct {
+	kind        cache.Kind
+	uuidAndHash []byte
+}
+
+// Responds to Get requests queued up in the reqs-channel.
+func (s *Server) respondToGetRequests(ctx context.Context, w io.Writer, reqs chan *serverGetRequest) error {
+	var start time.Time
+
+	for req := range reqs {
+		start = time.Now()
+		size, reader, err := s.Cache.Get(s.Namespace, req.kind, req.uuidAndHash)
+		s.logf(
+			ctx,
+			"Get kind=%c uuidAndHash=%s size=%d err=%v hit=%t",
+			req.kind, PrettyUuidAndHash(req.uuidAndHash), size, err, size > 0 && err == nil,
+		)
+
+		// Treat internal errors as MISS
+		if err != nil {
+			s.log(ctx, "Error getting from cache:", err)
+		}
+
+		if err != nil || size == 0 {
+			getCacheHit.WithLabelValues(s.Namespace, string(req.kind), "miss").Inc()
+			_, err = fmt.Fprintf(w, "-%c%s", req.kind, req.uuidAndHash)
+			if err != nil {
+				return err
+			}
+			if reader != nil {
+				reader.Close()
+			}
+			continue
+		}
+
+		// Everything's A-OK
+		_, err = fmt.Fprintf(w, "+%c%016x%s", req.kind, size, req.uuidAndHash)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(w, reader)
+		if err != nil {
+			return err
+		}
+		reader.Close()
+		getCacheHit.WithLabelValues(s.Namespace, string(req.kind), "hit").Inc()
+		getBytes.WithLabelValues(s.Namespace, string(req.kind)).Observe(float64(size))
+		getDurations.WithLabelValues(s.Namespace, string(req.kind)).Observe(time.Now().Sub(start).Seconds())
+	}
+	return nil
+}
+
 // Handles incoming requests.
 func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	s.waitGroup.Add(1)
 	start := time.Now()
+	readerAndWriterDone := sync.WaitGroup{}
+	getRequests := make(chan *serverGetRequest, 100000)
+
 	defer func() {
 		s.log(ctx, "Closing connection")
+		close(getRequests)
+		readerAndWriterDone.Wait()
 		conn.Close()
 		s.waitGroup.Done()
 	}()
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 	defer rw.Flush()
 
-	// Set deadline for getting data five seconds in the future
+	// Set 30s deadline for getting handshake done
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	var trx cache.Transaction
@@ -241,15 +298,23 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	s.logf(ctx, "Got client version %d", version)
 	fmt.Fprintf(rw, "%08x", version)
 
-	for {
-		// Extend Read-dealine by five seconds for each command we process
-		conn.SetDeadline(time.Now().Add(30 * time.Second))
+	// Flush version, so client will begin sending data
+	rw.Flush()
 
-		// Flush version or previous command
-		// The original server get really confused if clients do aggressive
-		// streaming. Explicitly waiting for output from previous command seem
-		// to make it happy...
-		rw.Flush()
+	// Now that we've done a handshake (and sent it), we begin doing async
+	// reading/writing, as the Unity editor wants to send *all* its
+	// get-requests before listening for responses.
+	readerAndWriterDone.Add(1)
+	go func(reqs chan *serverGetRequest) {
+		defer readerAndWriterDone.Done()
+
+		sendError := s.respondToGetRequests(ctx, conn, reqs)
+		s.logf(ctx, "Done sending data err=%s", sendError)
+	}(getRequests)
+
+	for {
+		// Extend Read-dealine by five minutes for each command we process
+		conn.SetDeadline(time.Now().Add(5 * time.Minute))
 
 		cmd, err := rw.ReadByte()
 		if err == io.EOF {
@@ -273,7 +338,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			s.log(ctx, "Error reading command type:", err)
 			return
 		}
-		s.logf(ctx, "Got command '%c'/'%c'", cmd, cmdType)
+		s.logf(ctx, "Got command op=%c kind=%c", cmd, cmdType)
 
 		start = time.Now()
 
@@ -284,32 +349,16 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			// Read uuidAndHash
 			uuidAndHash := make([]byte, 32)
 			_, err := io.ReadFull(rw, uuidAndHash)
-
-			s.logf(ctx, "Get '%c' '%s'", cmdType, PrettyUuidAndHash(uuidAndHash))
-
-			size, reader, err := s.Cache.Get(s.Namespace, cache.Kind(cmdType), uuidAndHash)
 			if err != nil {
-				getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "miss").Inc()
-				s.log(ctx, "Error reading from cache:", err)
-				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
-				continue
-			}
-			if size == 0 {
-				getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "miss").Inc()
-				s.log(ctx, "Cache miss")
-				fmt.Fprintf(rw, "-%c%s", cmdType, uuidAndHash)
-				if reader != nil {
-					reader.Close()
-				}
-				continue
+				s.logf(ctx, "Error reading: %s", err)
 			}
 
-			fmt.Fprintf(rw, "+%c%016x%s", cmdType, size, uuidAndHash)
-			io.Copy(rw, reader)
-			reader.Close()
-			getCacheHit.WithLabelValues(s.Namespace, string(cmdType), "hit").Inc()
-			getBytes.WithLabelValues(s.Namespace, string(cmdType)).Observe(float64(size))
-			getDurations.WithLabelValues(s.Namespace, string(cmdType)).Observe(time.Now().Sub(start).Seconds())
+			s.logf(ctx, "Get request parsed kind=%c uuidAndHash=%s", cmdType, PrettyUuidAndHash(uuidAndHash))
+			getRequests <- &serverGetRequest{
+				kind:        cache.Kind(cmdType),
+				uuidAndHash: uuidAndHash,
+			}
+
 			continue
 		}
 
@@ -319,7 +368,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			// Bail if we're already in a command
 			if trx != nil {
-				s.log(ctx, "Error starting trx inside trx")
+				s.log(ctx, "Transaction start error: Already in transaction")
 				return
 			}
 
@@ -331,7 +380,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 				return
 			}
 
-			s.logf(ctx, "Transaction started for %s", PrettyUuidAndHash(uuidAndHash))
+			s.logf(ctx, "Transaction start uuidAndHash=%s", PrettyUuidAndHash(uuidAndHash))
 
 			trx = s.Cache.PutTransaction(s.Namespace, uuidAndHash)
 			continue
@@ -342,15 +391,17 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			ops.WithLabelValues(s.Namespace, "te").Inc()
 
 			if trx == nil {
-				s.log(ctx, "Error ending trx - none started")
+				s.log(ctx, "Transaction end error: None started")
 				return
 			}
 
 			err := trx.Commit()
 			if err != nil {
-				s.log(ctx, "Error ending trx - cache commit error:", err)
+				s.log(ctx, "Transaction end error: Commit failed:", err)
 				continue
 			}
+
+			s.log(ctx, "Transaction end")
 
 			trx = nil
 			continue
@@ -362,7 +413,12 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 
 			// Bail on wrong CMD-types
 			if cmdType != 'a' && cmdType != 'i' && cmdType != 'r' {
-				s.logf(ctx, "Error putting - invalid type %s", []byte{cmdType})
+				s.logf(ctx, "Put error: invalid type '%s'", []byte{cmdType})
+				return
+			}
+
+			if trx == nil {
+				s.logf(ctx, "Put error: Not inside transaction")
 				return
 			}
 
@@ -370,22 +426,17 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 			sizeBytes := make([]byte, 16)
 			_, err := io.ReadFull(rw, sizeBytes)
 			if err != nil {
-				s.log(ctx, "Error putting - cannot read size:", err)
+				s.log(ctx, "Put error: cannot read size:", err)
 				return
 			}
 
 			// Parse size
 			size, err := strconv.ParseUint(string(sizeBytes), 16, 64)
 			if err != nil {
-				s.logf(ctx, "Error putting - cannot parse size '%x': %s", sizeBytes, err)
+				s.logf(ctx, "Put error: cannot parse size '%x': %s", sizeBytes, err)
 				return
 			}
-			s.log(ctx, "Put, size", string(sizeBytes), size)
-
-			if trx == nil {
-				s.logf(ctx, "Error putting: Not inside transaction")
-				return
-			}
+			s.logf(ctx, "Put kind=%c size=%d", cmdType, size)
 
 			trx.Put(int64(size), cache.Kind(cmdType), io.LimitReader(rw, int64(size)))
 
