@@ -35,6 +35,30 @@ func TestHandshakes(t *testing.T) {
 	}
 }
 
+func TestHTTPRedirect(t *testing.T) {
+	// Send the regular hex string '00fe'
+	client, server := net.Pipe()
+	s := NewServer(
+		func(s *Server) { s.RedirectHost = "example.com:9126" },
+		func(s *Server) { s.Namespace = "foobar" },
+	)
+	defer s.Stop()
+	go s.handleRequest(context.Background(), server)
+
+	go func() {
+		client.Write([]byte("GET /foobar HTTP/1.1"))
+	}()
+
+	out, err := ioutil.ReadAll(client)
+	if err != nil {
+		t.Errorf("Error reading response: %s", err)
+	}
+	expected := []byte("HTTP/1.1 302 Found\nLocation: http://example.com:9126/#foobar\n")
+	if !bytes.Equal(out, expected) {
+		t.Errorf("Expected reply for GET-requeset to be `%s`, got `%s`", expected, out)
+	}
+}
+
 func TestInvalidVersionHandshake(t *testing.T) {
 	client, server := net.Pipe()
 	s := NewServer()

@@ -41,6 +41,16 @@ func init() {
 	flag.Var(ports, "port", "Namespaces/ports to open (ex: zombie-zebras:5000) May be used multiple times")
 }
 
+// Normalize the address (usually HTTPAddress) to something we can pass on
+// elsewhere.
+func normalizeAddr(addr string) string {
+	if len(addr) > 0 && addr[0] == ':' {
+		return "localhost" + addr
+	}
+
+	return addr
+}
+
 func main() {
 	flag.Parse()
 
@@ -85,6 +95,7 @@ func main() {
 				}
 			},
 			func(s *ucs.Server) { s.Namespace = ns },
+			func(s *ucs.Server) { s.RedirectHost = normalizeAddr(HTTPAddress) },
 		)
 		servers = append(servers, server)
 		go func(port uint) {

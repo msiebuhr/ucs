@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -62,6 +63,9 @@ type Server struct {
 	Cache     cache.Cacher
 	Log       *log.Logger
 	Namespace string
+
+	// If set, HTTP-looking requests will be redirected here.
+	RedirectHost string
 
 	closer    chan bool
 	waitGroup *sync.WaitGroup
@@ -282,6 +286,18 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 	// First, read uint32 version number
 	version, err := readVersionNumber(rw)
 	if err != nil {
+		// If the "number" started with "GET", we assume it's a
+		// HTTP-request and respond in kind
+		if convError, ok := err.(*strconv.NumError); ok && strings.Contains(convError.Num, "GET ") && s.RedirectHost != "" {
+			s.log(ctx, "Got HTTP-looking request; redirect=%s", s.RedirectHost)
+			fmt.Fprintf(
+				rw,
+				"HTTP/1.1 302 Found\nLocation: http://%s/#%s\n",
+				s.RedirectHost, s.Namespace,
+			)
+			rw.Flush()
+			return
+		}
 		s.logf(ctx, "Could not read client version: %s", err)
 		return
 	}
