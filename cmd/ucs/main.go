@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -94,6 +95,14 @@ func main() {
 
 	// Set up web-server mux
 	mux := http.NewServeMux()
+
+	// Copy/paste from https://golang.org/src/net/http/pprof/pprof.go?s=6729:6767#L208
+	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
+	mux.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+	mux.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+	mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
+
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.Handle("/", http.FileServer(frontend.FS(false)))
 	mux.HandleFunc("/api/info", func(w http.ResponseWriter, r *http.Request) {
