@@ -3,6 +3,9 @@
 Version and size numbers are sent back end forth in hex-encoding. Eg. the
 version is sent as `000000fe` over the wire (and *not* the binary `000\u00fe`).
 
+The 128 bit UUIDs are sent as 16 bytes (i.e. without any encoding), as are the
+corresponding hashes.
+
 ## Version check
 
 ```
@@ -37,17 +40,22 @@ client <-- '+r' (size <uint64>) (id <128bit GUID><128bit HASH>) + size bytes ---
 client <-- '-r' (id <128bit GUID><128bit HASH>) --- server (not found in cache)
 ```
 
-Cache miss:
+Get-request and cache miss:
 
     grUUIDUUIDUUIDUUIDHASHHASHHASHHASH # uuid/hash is sent as 32 bytes
     -rUUIDUUIDUUIDUUIDHASHHASHHASHHASH # negative response
 
-Cache hit:
+Get-request and cache hit:
 
     grUUIDUUIDUUIDUUIDHASHHASHHASHHASH
     +r00000000000000ffUUIDUUIDUUIDUUIDHASHHASHHASHHASH<255 bytes of data>
 
 Note that the size is sent as 16 bytes encoded as hexadecimal
+
+The editor expects the cache to be asyncronous -- that is, it sends off *all*
+it's get-requests before it begins reading any response. In practical terms,
+this means any server-implemetation will need some kind of internal queue for
+get-requests.
 
 ## Putting items
 
