@@ -7,7 +7,7 @@ executors:
     golang:
         docker:
             - image: circleci/golang:1.12
-        working_directory: /go/src/github.com/msiebuhr/ucs
+        working_directory: /go/ucs
 
 jobs:
   build:
@@ -25,6 +25,8 @@ jobs:
           command: |
               go fmt ./...
               git diff --exit-code
+
+      - run: go mod download
 
       - run: go get -u github.com/jstemmer/go-junit-report
       - run:
