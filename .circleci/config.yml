@@ -28,6 +28,13 @@ jobs:
 
       - run: go mod download
 
+      - run:
+          name: Generate
+          command: |
+              go get -u github.com/mjibson/esc
+              go generate ./...
+              git diff --exit-code ./frontend/
+
       - run: go get -u github.com/jstemmer/go-junit-report
       - run:
           name: Unit tests
@@ -62,13 +69,6 @@ jobs:
     steps:
       - checkout
       - run: mkdir -p $TEST_RESULTS
-
-      - run:
-          name: Generate
-          command: |
-              go get -u github.com/mjibson/esc
-              go generate ./...
-              git diff --exit-code ./frontend/
 
       - run:
           name: Bench
