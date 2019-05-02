@@ -13,8 +13,9 @@ import (
 // Cache requester is for talking to the cache
 type CacheRequester interface {
 	// Write out what should be sent as the request
-	WriteRequest(io.Writer) error
+	WriteTo(io.Writer) (int64, error)
 	// Read the response of the wire
+	// TODO: Use io.ReaderFrom(io.Reader) (int64, error)
 	ReadResponse(io.Reader) error
 }
 
@@ -48,9 +49,9 @@ func (g GetRequest) Read(p []byte) (int, error) {
 	return g.r.Read(p)
 }
 
-func (g GetRequest) WriteRequest(w io.Writer) error {
-	_, err := fmt.Fprintf(w, "g%s%s", g.K, g.uuidAndHash)
-	return err
+func (g GetRequest) WriteTo(w io.Writer) (int64, error) {
+	n, err := fmt.Fprintf(w, "g%s%s", g.K, g.uuidAndHash)
+	return int64(n), err
 }
 
 func (g GetRequest) ReadResponse(r io.Reader) error {
@@ -138,32 +139,47 @@ func (p PutRequest) ReadResponse(r io.Reader) error {
 	return nil
 }
 
-func (p PutRequest) WriteRequest(w io.Writer) error {
-	_, err := fmt.Fprintf(w, "ts%s", p.uuidAndHash)
+func (p PutRequest) WriteTo(w io.Writer) (int64, error) {
+	var written int64 = 0
+	n, err := fmt.Fprintf(w, "ts%s", p.uuidAndHash)
+	written += int64(n)
 	if err != nil {
-		return err
+		return written, err
 	}
 
 	if p.info != nil {
 		fmt.Fprintf(w, "pi%016x", p.info.size)
-		io.Copy(w, p.info.r)
+		n64, err := io.Copy(w, p.info.r)
+		written += n64
+		if err != nil {
+			return written, err
+		}
 		// TODO: Err handling
 	}
 
 	if p.asset != nil {
 		fmt.Fprintf(w, "pa%016x", p.asset.size)
-		io.Copy(w, p.asset.r)
+		n64, err := io.Copy(w, p.asset.r)
+		written += n64
+		if err != nil {
+			return written, err
+		}
 		// TODO: Err handling
 	}
 
 	if p.resource != nil {
 		fmt.Fprintf(w, "pr%016x", p.resource.size)
-		io.Copy(w, p.resource.r)
+		n64, err := io.Copy(w, p.resource.r)
+		written += n64
+		if err != nil {
+			return written, err
+		}
 		// TODO: Err handling
 	}
 
-	_, err = fmt.Fprintf(w, "te")
-	return err
+	n, err = fmt.Fprintf(w, "te")
+	written += int64(n)
+	return written, err
 }
 
 // Generic cache client
@@ -188,7 +204,7 @@ func (c Client) NegotiateVersion(my uint32) (uint32, error) {
 }
 
 func (c Client) Execute(req CacheRequester) error {
-	err := req.WriteRequest(c.Conn)
+	_, err := req.WriteTo(c.Conn)
 	if err != nil {
 		return err
 	}
