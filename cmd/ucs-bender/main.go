@@ -48,7 +48,8 @@ func SyntheticCacheRequests(n int, commands int, size int64) chan interface{} {
 
 	go func() {
 		for i := 0; i < n; i++ {
-			reqs := []ucs.CacheRequester{}
+			halfPipe, _ := net.Pipe()
+			client := ucs.NewBulkClientConn(halfPipe)
 
 			switch i % 3 {
 			case 0:
@@ -57,28 +58,22 @@ func SyntheticCacheRequests(n int, commands int, size int64) chan interface{} {
 				// Tonnes of GET-requests
 				for j := 0; j < commands; j++ {
 					guidAndHash[0] = byte(i + j)
-					reqs = append(
-						reqs,
-						ucs.Get(cache.KIND_INFO, guidAndHash),
-						ucs.Get(cache.KIND_ASSET, guidAndHash),
-					)
+					client.Get(cache.KIND_INFO, guidAndHash)
+					client.Get(cache.KIND_ASSET, guidAndHash)
 				}
 			case 2:
 				// Put-requests
 				for j := 0; j < commands; j++ {
 					guidAndHash[0] = byte(i + j)
-					reqs = append(
-						reqs,
-						ucs.Put(
-							guidAndHash,
-							ucs.PutString("info"),
-							PutRandom(size), // Asset
-							nil,
-						),
-					)
+					client.Put(ucs.Put(
+						guidAndHash,
+						ucs.PutString("info"),
+						PutRandom(size), //Asset
+						nil,
+					))
 				}
 			}
-			c <- reqs
+			c <- client
 		}
 		close(c)
 	}()
@@ -89,9 +84,9 @@ func SyntheticCacheRequests(n int, commands int, size int64) chan interface{} {
 // Executes request-series against the cache server
 func CacheExecutor(unix_nsec int64, transport interface{}) (interface{}, error) {
 	// Convert transport into cache requests
-	buf, ok := transport.([]ucs.CacheRequester)
+	c, ok := transport.(*ucs.BulkClient)
 	if !ok {
-		return nil, errors.New("Transport was not []CacheRequester")
+		return nil, errors.New("Transport was not *ucs.BulkClient")
 	}
 
 	// Create buffered connection
@@ -100,36 +95,25 @@ func CacheExecutor(unix_nsec int64, transport interface{}) (interface{}, error) 
 		return nil, err
 		//log.Fatalf("Could not connect: %s", err)
 	}
+	defer conn.Close()
 
-	c := ucs.NewClient(conn)
+	c.Conn = conn
+	c.Callback = func(k cache.Kind, uuidAndHash []byte, hit bool, data io.Reader) {
+		io.Copy(ioutil.Discard, data)
+	}
+
 	_, err = c.NegotiateVersion(254)
 	if err != nil {
 		return nil, err
 	}
-	defer c.Close()
+	//defer c.Close()
 
 	// Execute requests
-	for _, req := range buf {
-		// Check if it is a PUT or GET request
-		if get, ok := req.(*ucs.GetRequest); ok {
-			go io.Copy(ioutil.Discard, get)
-			/*
-				go func () {
-					data, err := ioutil.ReadAll(get)
-					if err != nil { fmt.Printf("err: %s", err) }
-					fmt.Printf("  data: %db", len(data))
-				}()
-			*/
-			err = c.Execute(get)
-		} else {
-			err = c.Execute(req)
-		}
-		if err != nil {
-			return nil, err
-		}
+	err = c.Execute()
+	if err != nil {
+		return nil, err
 	}
 
-	// Return output
 	return nil, nil
 }
 

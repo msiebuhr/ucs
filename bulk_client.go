@@ -36,13 +36,17 @@ func (c BulkClient) NegotiateVersion(my uint32) (uint32, error) {
 	return uint32(version), err
 }
 
+// Gracefully quit the current connection and close down
 func (c BulkClient) Quit() error {
 	_, err := fmt.Fprintf(c.Conn, "q")
 	return err
 }
 
-// Send request to back-end, but don't read responses until we're ready.
-//func SendRequest(req CacheRequester) { }
+// Close the connection. Unpolite, I guess, but that's what Unity is
+// observed to do in the wild.
+func (c BulkClient) Close() error {
+	return c.Conn.Close()
+}
 
 // Enqueue a get-request and wait for response to show up
 func (c *BulkClient) Get(K cache.Kind, uuidAndHash []byte) error {
