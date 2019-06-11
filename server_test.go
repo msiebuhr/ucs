@@ -70,7 +70,7 @@ func TestShortVersionHandshake(t *testing.T) {
 		t.Errorf("Error reading response: %s", err)
 	}
 	if !bytes.Equal(out, []byte("000000fe")) {
-		t.Errorf("Expected reply for version `00000000` to be `00000000`, got `%s`", out)
+		t.Errorf("Expected reply for version `fe` to be `000000fe`, got `%s`", out)
 	}
 }
 
