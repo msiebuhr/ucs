@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
+	"io"
 	"log"
 	"math/rand"
 	"net"
@@ -32,7 +32,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	c := ucs.NewClient(conn)
+	c := ucs.NewBulkClientConn(conn)
 
 	// Send version code and read answer
 	version, err := c.NegotiateVersion(0xfe)
@@ -42,33 +42,34 @@ func main() {
 	}
 	log.Printf("Got version %d", version)
 
+	c.Callback = func(k cache.Kind, uuidAndHash []byte, hit bool, data io.Reader) {
+		log.Printf("Got response from server %t %x", hit, uuidAndHash)
+	}
+
 	// Make a random (failing) request
 	randomGuidAndHash := make([]byte, 32)
 	rand.Read(randomGuidAndHash)
 
-	req := ucs.Get(cache.KIND_INFO, randomGuidAndHash)
-	go func() {
-		data, err := ioutil.ReadAll(req)
-		log.Printf("Got response from client %t %d, %v", req.Hit(), len(data), err)
-	}()
-	c.Execute(req)
+	c.Get(cache.KIND_INFO, randomGuidAndHash)
+	c.Execute()
+
+	log.Printf("Uploading")
 
 	data := make([]byte, size)
-	putReq := ucs.Put(
+	c.Put(
 		randomGuidAndHash,
 		ucs.PutString(string(data)), nil, nil,
 		//PutString(string(data)),
 		//PutString(string(data)),
 	)
-	c.Execute(putReq)
+	c.Execute()
+	log.Printf("Uploading done")
 
+	log.Printf("Fetching again")
 	// Try getting it again
-	req = ucs.Get(cache.KIND_INFO, randomGuidAndHash)
-	go func() {
-		data, err := ioutil.ReadAll(req)
-		log.Printf("Got response from client %t %d, %v", req.Hit(), len(data), err)
-	}()
-	c.Execute(req)
+	c.Get(cache.KIND_INFO, randomGuidAndHash)
+	c.Execute()
+	log.Printf("Fetched again")
 
 	c.Quit()
 }
