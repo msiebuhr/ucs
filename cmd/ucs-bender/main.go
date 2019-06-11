@@ -65,12 +65,12 @@ func SyntheticCacheRequests(n int, commands int, size int64) chan interface{} {
 				// Put-requests
 				for j := 0; j < commands; j++ {
 					guidAndHash[0] = byte(i + j)
-					client.Put(ucs.Put(
+					client.Put(
 						guidAndHash,
 						ucs.PutString("info"),
 						PutRandom(size), //Asset
 						nil,
-					))
+					)
 				}
 			}
 			c <- client

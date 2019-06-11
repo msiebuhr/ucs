@@ -33,7 +33,7 @@ func TestBulkClient(t *testing.T) {
 	}
 
 	// Upload an asset
-	c.Put(Put(uuidAndHash, PutString("information blob"), nil, nil))
+	c.Put(uuidAndHash, PutString("information blob"), nil, nil)
 
 	// Callback should throw error if something bad happens
 	c.Callback = func(k cache.Kind, uuidAndHash []byte, hit bool, data io.Reader) {

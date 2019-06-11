@@ -61,8 +61,8 @@ func (c *BulkClient) GetCallback(callback func(K cache.Kind, uuidAndHash []byte,
 }
 
 // Putting data
-func (c *BulkClient) Put(p *PutRequest) {
-	c.putRequests = append(c.putRequests, p)
+func (c *BulkClient) Put(uuidAndHash []byte, i *PutObject, a *PutObject, r *PutObject) {
+	c.putRequests = append(c.putRequests, &putRequest{uuidAndHash, i, a, r})
 }
 
 func (c *BulkClient) Execute() error {

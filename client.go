@@ -7,8 +7,7 @@ import (
 )
 
 // PUT Objects. A plain reader, but we need a size up-front.
-// TODO: Implement lot's of magic (file sizes, string.NewReader) etc. This
-// should eventually be put in PutRequest as internal helper functions.
+// TODO: Implement lot's of magic (file sizes, string.NewReader) etc.
 type PutObject struct {
 	r    io.Reader
 	size int
@@ -29,28 +28,14 @@ func PutString(s string) *PutObject {
 	)
 }
 
-type PutRequest struct {
-	io.Reader
+type putRequest struct {
 	uuidAndHash []byte
 	info        *PutObject
 	asset       *PutObject
 	resource    *PutObject
 }
 
-func Put(uuidAndHash []byte, i *PutObject, a *PutObject, r *PutObject) *PutRequest {
-	return &PutRequest{
-		uuidAndHash: uuidAndHash,
-		info:        i,
-		asset:       a,
-		resource:    r,
-	}
-}
-
-func (p PutRequest) ReadResponse(r io.Reader) error {
-	return nil
-}
-
-func (p PutRequest) WriteTo(w io.Writer) (int64, error) {
+func (p putRequest) WriteTo(w io.Writer) (int64, error) {
 	var written int64 = 0
 	n, err := fmt.Fprintf(w, "ts%s", p.uuidAndHash)
 	written += int64(n)

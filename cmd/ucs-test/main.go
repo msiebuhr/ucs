@@ -56,13 +56,12 @@ func main() {
 	log.Printf("Uploading")
 
 	data := make([]byte, size)
-	putReq := ucs.Put(
+	c.Put(
 		randomGuidAndHash,
 		ucs.PutString(string(data)), nil, nil,
 		//PutString(string(data)),
 		//PutString(string(data)),
 	)
-	c.Put(putReq)
 	c.Execute()
 	log.Printf("Uploading done")
 
