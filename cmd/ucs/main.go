@@ -76,7 +76,7 @@ func main() {
 
 	// Create a server per namespace
 	servers := make([]*ucs.Server, 0, len(*ports))
-	for ns, port := range *ports {
+	for port, ns := range *ports {
 		server := ucs.NewServer(
 			func(s *ucs.Server) { s.Cache = c },
 			func(s *ucs.Server) {
@@ -126,19 +126,22 @@ func main() {
 			}
 		}
 
-		servers := map[string]string{}
-		for ns, port := range *ports {
+		servers := map[string][]string{}
+		for port, ns := range *ports {
 			// Parse address to figure out what port/ip we're bound to
 			tcpAddr := net.TCPAddr{
 				IP:   ip,
 				Port: int(port),
 			}
-			servers[ns] = tcpAddr.String()
+			if _, ok := servers[ns]; !ok {
+				servers[ns] = []string{}
+			}
+			servers[ns] = append(servers[ns], tcpAddr.String())
 		}
 
 		data := struct {
 			QuotaBytes   int64
-			Servers      map[string]string
+			Servers      map[string][]string
 			CacheBackend string
 		}{
 			QuotaBytes:   quota.Int64(),

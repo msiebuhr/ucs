@@ -212,11 +212,13 @@ func (s *Server) respondToGetRequests(ctx context.Context, w io.Writer, reqs cha
 	for req := range reqs {
 		start = time.Now()
 		size, reader, err := s.Cache.Get(s.Namespace, req.kind, req.uuidAndHash)
-		s.logf(
-			ctx,
-			"Get kind=%c uuidAndHash=%s size=%d err=%v hit=%t",
-			req.kind, PrettyUuidAndHash(req.uuidAndHash), size, err, size > 0 && err == nil,
-		)
+		/*
+			s.logf(
+				ctx,
+				"Get kind=%c uuidAndHash=%s size=%d err=%v hit=%t",
+				req.kind, PrettyUuidAndHash(req.uuidAndHash), size, err, size > 0 && err == nil,
+			)
+		*/
 
 		// Treat internal errors as MISS
 		if err != nil {
@@ -353,7 +355,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 				s.logf(ctx, "Error reading: %s", err)
 			}
 
-			s.logf(ctx, "Get request parsed kind=%c uuidAndHash=%s", cmdType, PrettyUuidAndHash(uuidAndHash))
+			//s.logf(ctx, "Get request parsed kind=%c uuidAndHash=%s", cmdType, PrettyUuidAndHash(uuidAndHash))
 			getRequests <- &serverGetRequest{
 				kind:        cache.Kind(cmdType),
 				uuidAndHash: uuidAndHash,
@@ -380,7 +382,7 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn) {
 				return
 			}
 
-			s.logf(ctx, "Transaction start uuidAndHash=%s", PrettyUuidAndHash(uuidAndHash))
+			//s.logf(ctx, "Transaction start uuidAndHash=%s", PrettyUuidAndHash(uuidAndHash))
 
 			trx = s.Cache.PutTransaction(s.Namespace, uuidAndHash)
 			continue

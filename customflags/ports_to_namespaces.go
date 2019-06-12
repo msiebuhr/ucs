@@ -6,24 +6,24 @@ package customflags
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/docker/go-units"
 )
 
-type Namespaces map[string]uint
+type Namespaces map[uint]string
 
 // Pretty-prints namespace/port sets.
 func (f *Namespaces) String() string {
 	if len(*f) == 0 {
 		return ""
 	}
-	str := ""
-	for ns, port := range *f {
-		str = fmt.Sprintf("%s %s:%d", str, ns, port)
+	pairs := make([]string, 0, len(*f))
+	for port, ns := range *f {
+		pairs = append(pairs, fmt.Sprintf("%s:%d", ns, port))
 	}
-	return str[1:]
+	sort.Strings(pairs)
+	return strings.Join(pairs, " ")
 }
 
 // Sets a namespace/port combination from either just a number, e.g. "5000",
@@ -54,31 +54,11 @@ func (f Namespaces) setSingle(s string) error {
 		return err
 	}
 
-	f[name] = uint(port)
-	return nil
-}
-
-// Quick-and-dirty human-readable sizes
-type Size int64
-
-func (v Size) String() string {
-	return units.BytesSize(float64(v))
-}
-
-func (v Size) Int64() int64 {
-	return int64(v)
-}
-
-func (v *Size) Set(s string) error {
-	b, err := units.RAMInBytes(s)
-	if err != nil {
-		return err
+	// Fail if port is already set
+	if ns, ok := f[uint(port)]; ok {
+		return fmt.Errorf("Port %d is already used for namespace '%s'", port, ns)
 	}
-	*v = Size(b)
-	return nil
-}
 
-func NewSize(s int64) *Size {
-	size := Size(s)
-	return &size
+	f[uint(port)] = name
+	return nil
 }

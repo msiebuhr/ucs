@@ -68,8 +68,9 @@
 
 			if (key === 'Servers') {
 				ul = ""
-				for (const [ns, addr] of Object.entries(value)) {
-					elem.append(`<li>${ns} → <code>${addr}</code></li>`)
+				for (const [ns, addrs] of Object.entries(value)) {
+					const addrTags = addrs.map(a => `<code>${a}</code>`);
+					elem.append(`<li>${ns} → ${addrTags.join(", ")}</li>`)
 				}
 			}
 
