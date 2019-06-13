@@ -43,12 +43,16 @@ type FS struct {
 	Basepath string
 	Size     int64
 	Quota    int64
+	MaxAge   time.Duration
 
 	transactionCout uint64
 }
 
 func NewFS(options ...func(*FS)) (*FS, error) {
-	fs := &FS{Basepath: "./unity-cache"}
+	fs := &FS{
+		Basepath: "./unity-cache",
+		MaxAge:   time.Hour * 24 * 90, // 90 days
+	}
 	for _, f := range options {
 		f(fs)
 	}
@@ -92,14 +96,15 @@ func (fs *FS) collectGarbage() {
 // Also re-calculates the total size of cache directory, now we're at scanning
 // everything anyway...
 func (fs *FS) collectGarbageOnce() {
+	maxAgeTimestamp := time.Now().Add(-1 * fs.MaxAge)
+
 	// Report quota up front
 	fs_quota.Set(float64(fs.Quota))
 
 	start := time.Now()
+	defer fs_gc_duration.Observe(time.Now().Sub(start).Seconds())
 
 	fs.lock.Lock()
-
-	defer fs_gc_duration.Observe(time.Now().Sub(start).Seconds())
 	defer fs.lock.Unlock()
 
 	totalSize, old, err := findApproximateOldFiles(fs.Basepath)
@@ -111,13 +116,17 @@ func (fs *FS) collectGarbageOnce() {
 
 	fs.Size = totalSize
 
-	// Ideally, we should delete the very oldest stuff first (and both info and
-	// asset/resource), and then re-scan that directory.
-	// But I'm lazy right now - let's just delete the oldst thing we found in
-	// all folders and see how far that get's us.
-	for i := 0; i < len(old) && fs.Size > fs.Quota; i += 1 {
+	// Ideally, we should delete the very oldest stuff first and then re-scan
+	// that directory. But I'm lazy right now - let's just delete the oldst
+	// thing we found in all folders and see how far that get's us.
+	for i := 0; i < len(old); i += 1 {
 		if len(old[i].uuidAndHash) == 0 {
 			continue
+		}
+
+		// Bail if we're below quota or item is new enough to keep around
+		if fs.Size <= fs.Quota && old[i].time.After(maxAgeTimestamp) {
+			break
 		}
 
 		successfulDeletes := 0
@@ -130,21 +139,12 @@ func (fs *FS) collectGarbageOnce() {
 			}
 		}
 
-		// Accounting is approximate, as findApproximateOldFiles() doesn't
-		// guarantee that it finds all kinds of a resource in one go (yet we
-		// delete them in one go).
-		//
 		// Next loop of the GC should fix the overall stats, tho.
 		if successfulDeletes > 0 {
 			size := float64(old[i].size)
 			fs_gc_bytes.Add(size)
 			fs_size.WithLabelValues(old[i].ns).Sub(size)
 			fs.Size -= old[i].size
-		}
-
-		// Bail if we get below the quota
-		if fs.Size <= fs.Quota {
-			return
 		}
 	}
 }
