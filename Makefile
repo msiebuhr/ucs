@@ -3,5 +3,5 @@
 git-install-hook: .git/hooks/pre-commit
 
 .git/hooks/pre-commit:
-	curl https://golang.org/misc/git/pre-commit > $@
+	curl https://golang.org/misc/git/pre-commit?m=text > $@
 	chmod +x $@
