@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"runtime"
 	"testing"
 )
 
@@ -119,11 +118,6 @@ func TestFSQuota(t *testing.T) {
 			t.Fatalf("Unexpected error calling Put(): %s", err)
 		}
 		tx.Commit()
-
-		// This check is unreliable on Linux -- atime precision, perhaps?
-		if runtime.GOOS == "linux" {
-			continue
-		}
 
 		// Run the garbage collector explicitly
 		f.collectGarbage()

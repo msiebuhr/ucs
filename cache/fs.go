@@ -140,6 +140,7 @@ func (fs *FS) collectGarbageOnce() {
 					continue
 				}
 
+				oldIndex := i + 256*nsIndex
 				for _, entry := range entries {
 					if entry.IsDir() {
 						continue
@@ -151,8 +152,7 @@ func (fs *FS) collectGarbageOnce() {
 
 					// Check if it's the oldest thing we've found in this directory
 					t := fileinfo_atime(entry)
-					oldIndex := i + 256*nsIndex
-					if len(old[oldIndex].uuidAndHash) == 0 || t.Before(old[i].time) {
+					if len(old[oldIndex].uuidAndHash) == 0 || t.Before(old[oldIndex].time) {
 						old[oldIndex].ns = ns
 						old[oldIndex].uuidAndHash = entry.Name() // TODO: Chop off extension
 						old[oldIndex].size = entry.Size()
