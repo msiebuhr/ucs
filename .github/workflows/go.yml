@@ -3,12 +3,14 @@ on: [push]
 jobs:
 
   test:
-    name: Format
-    runs-on: [linux]
+    name: Code style
+    runs-on: ubuntu-latest
     steps:
 
     - name: Set up Go
       uses: actions/setup-go@v1
+      with:
+            go-version: 1.13.x
       id: go
 
     - name: Check out code into the Go module directory
@@ -22,13 +24,24 @@ jobs:
         go fmt ./...
         git diff --exit-code
 
+    - name: Go vet
+      run: |
+        go vet ./...
+        git diff --exit-code
+
   build:
     name: Build
-    runs-on: [linux, macOS-latest]
+    strategy:
+        matrix:
+            os: [ubuntu-latest, macos-latest]
+        fail-fast: false
+    runs-on: ${{ matrix.os }}
     steps:
 
     - name: Set up Go
       uses: actions/setup-go@v1
+      with:
+            go-version: 1.13.x
       id: go
 
     - name: Check out code into the Go module directory
