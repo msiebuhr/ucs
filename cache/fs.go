@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -103,77 +102,14 @@ func (fs *FS) collectGarbageOnce() {
 	defer fs_gc_duration.Observe(time.Now().Sub(start).Seconds())
 	defer fs.lock.Unlock()
 
-	fs.Size = 0
+	totalSize, old, err := findApproximateOldFiles(fs.Basepath)
 
-	// Find all namespaces
-	dir, err := os.Open(fs.Basepath)
 	if err != nil {
+		fmt.Printf("Error running GC: %#v\n", err)
 		return
 	}
 
-	entries, err := dir.Readdir(0)
-	if err != nil {
-		return
-	}
-
-	old := make(fsCacheEntries, 256*len(entries))
-
-	sizes := make([]int64, len(entries))
-	allDone := sync.WaitGroup{}
-	for nsIndex, ns := range entries {
-		if !ns.IsDir() {
-			continue
-		}
-		allDone.Add(1)
-		go func(ns string, nsIndex int) {
-			defer allDone.Done()
-			// There be 256 folders - let's find the oldest one + it's size
-			// TODO: Split into ~256 go-routines for speed
-			for i := 0; i < 256; i += 1 {
-				dirname := filepath.Join(fs.Basepath, ns, fmt.Sprintf("%02x", i))
-				dir, err := os.Open(dirname)
-				if err != nil {
-					continue
-				}
-				entries, err := dir.Readdir(0)
-				if err != nil {
-					continue
-				}
-
-				oldIndex := i + 256*nsIndex
-				for _, entry := range entries {
-					if entry.IsDir() {
-						continue
-					}
-
-					// Count up sizes of everything
-					//fs.Size += entry.Size()
-					sizes[nsIndex] += entry.Size()
-
-					// Check if it's the oldest thing we've found in this directory
-					t := fileinfo_atime(entry)
-					if len(old[oldIndex].uuidAndHash) == 0 || t.Before(old[oldIndex].time) {
-						old[oldIndex].ns = ns
-						old[oldIndex].uuidAndHash = entry.Name() // TODO: Chop off extension
-						old[oldIndex].size = entry.Size()
-						old[oldIndex].time = t
-					}
-				}
-				dir.Close()
-			}
-			fs_size.WithLabelValues(ns).Set(float64(sizes[nsIndex]))
-		}(ns.Name(), nsIndex)
-	}
-	dir.Close()
-	allDone.Wait()
-
-	// Add up sizes
-	fs.Size = 0
-	for _, size := range sizes {
-		fs.Size += size
-	}
-
-	sort.Sort(old)
+	fs.Size = totalSize
 
 	// Ideally, we should delete the very oldest stuff first (and both info and
 	// asset/resource), and then re-scan that directory.
