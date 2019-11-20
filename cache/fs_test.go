@@ -101,36 +101,36 @@ func TestFSQuota(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating FS: %s", err)
 	}
+	os.RemoveAll(f.Basepath)
 	defer func() {
 		os.RemoveAll(f.Basepath)
 	}()
 
-	keys := make([][]byte, 100)
+	// Insert 100 two-byte keys and check the size never gets above 100 bytes.
+	for i := 0; i < 100; i++ {
+		key := make([]byte, 32)
+		rand.Read(key)
 
-	// Insert 100 keys
-	for i := 0; i < len(keys); i++ {
-		keys[i] = make([]byte, 32)
-		rand.Read(keys[i])
-
-		tx := f.PutTransaction("fs", keys[i])
-		err := tx.Put(1, KIND_INFO, bytes.NewReader([]byte{byte(i)}))
+		tx := f.PutTransaction("fs", key)
+		err := tx.Put(1, KIND_INFO, bytes.NewReader([]byte{byte(i), byte(i)}))
 		if err != nil {
 			t.Fatalf("Unexpected error calling Put(): %s", err)
 		}
 		tx.Commit()
-
-		// Run the garbage collector explicitly
-		f.collectGarbage()
-		f.lock.Lock()
-		if f.Size != int64(i)+1 {
-			t.Errorf("Expected cache size to be %d, got %d", i+1, f.Size)
-		}
-		f.lock.Unlock()
 	}
 
-	// Put something large and check it is bumps everything else off
-	data := make([]byte, 100)
-	tx := f.PutTransaction("fs", make([]byte, 32))
+	// TODO: Check there is 50 items in the cache.
+	f.lock.Lock()
+	if f.Size > f.Quota {
+		t.Errorf("Expected cache size to be at most %d, got %d", f.Quota, f.Size)
+	}
+	f.lock.Unlock()
+
+	// Put something large and check it doesn't get bumped immediately
+	key := make([]byte, 32)
+	rand.Read(key)
+	data := make([]byte, 50)
+	tx := f.PutTransaction("fs", key)
 	tx.Put(int64(len(data)), KIND_INFO, bytes.NewReader(data))
 	tx.Commit()
 
@@ -138,5 +138,11 @@ func TestFSQuota(t *testing.T) {
 	f.collectGarbage()
 	if f.Size != 100 {
 		t.Errorf("Expected cache size to be 100, has %d", f.Size)
+	}
+
+	// Get the last element out again...
+	size, _, err := f.Get("fs", KIND_INFO, key)
+	if size != int64(len(data)) {
+		t.Errorf("Expected to get %d-byte key back, got %db", len(data), size)
 	}
 }
