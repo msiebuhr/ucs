@@ -4,7 +4,6 @@ import (
 	"bytes"
 	//"reflect"
 	//"time"
-	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -44,12 +43,12 @@ func TestFSFindApproximateOldFiles(t *testing.T) {
 	}
 
 	if len(entries) != 1 {
-		t.Errorf("Expected one entry, got %d", len(entries))
+		t.Fatalf("Expected one entry, got %d", len(entries))
 	}
 
 	expected := fsCacheEntry{
 		ns:          "list-old-files",
-		uuidAndHash: fmt.Sprintf("%x-%x.info", key[0:16], key[16:32]),
+		uuidAndHash: key,
 		size:        3,
 		//time: time.Now(), // TODO: Grab from FS?
 	}
@@ -58,7 +57,7 @@ func TestFSFindApproximateOldFiles(t *testing.T) {
 		t.Errorf("Expected entry ns to be %s, got %s", expected.ns, entries[0].ns)
 	}
 
-	if entries[0].uuidAndHash != expected.uuidAndHash {
+	if !bytes.Equal(entries[0].uuidAndHash, expected.uuidAndHash) {
 		t.Errorf("Expected entry UUID+Hash to be\n\t%s\ngot\n\t%s", expected.uuidAndHash, entries[0].uuidAndHash)
 	}
 }

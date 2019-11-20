@@ -116,14 +116,24 @@ func (fs *FS) collectGarbageOnce() {
 	// But I'm lazy right now - let's just delete the oldst thing we found in
 	// all folders and see how far that get's us.
 	for i := 0; i < len(old) && fs.Size > fs.Quota; i += 1 {
-		if old[i].uuidAndHash == "" {
+		if len(old[i].uuidAndHash) == 0 {
 			continue
 		}
 
-		path := filepath.Join(fs.Basepath, old[i].ns, old[i].uuidAndHash[:2], old[i].uuidAndHash)
+		successfulDeletes := 0
+		for _, kind := range []Kind{KIND_ASSET, KIND_INFO, KIND_RESOURCE} {
+			path := fs.generateFilename(old[i].ns, kind, old[i].uuidAndHash)
 
-		err := os.Remove(path)
-		if err == nil {
+			err := os.Remove(path)
+			if err != nil {
+				successfulDeletes += 1
+			}
+		}
+
+		// FIXME: This is quite wrong, as we'll only decrement the counter by one of
+		// the elements. (findApproximateOldFiles() really should cough up with
+		// one Size-number for all files sharing an uuidAndHash)
+		if successfulDeletes > 0 {
 			size := float64(old[i].size)
 			fs_gc_bytes.Add(size)
 			fs_size.WithLabelValues(old[i].ns).Sub(size)

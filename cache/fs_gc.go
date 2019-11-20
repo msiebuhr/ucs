@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -15,7 +16,7 @@ import (
 
 type fsCacheEntry struct {
 	ns          string
-	uuidAndHash string
+	uuidAndHash []byte
 	size        int64
 	time        time.Time
 }
@@ -35,6 +36,27 @@ func (f fsCacheEntries) Less(i, j int) bool {
 	return f[i].time.Before(f[j].time)
 }
 func (f fsCacheEntries) Swap(i, j int) { f[i], f[j] = f[j], f[i] }
+
+// Parses the uuidAndHash from a base filename, such as the one made by
+// `generateFilename()`.
+func parseFilename(baseFilename string) ([]byte, error) {
+	if len(baseFilename) < 65 {
+		return []byte{}, fmt.Errorf("Filename too short")
+	}
+	// Parse out uuidAndHash
+	// TODO(deal with errors);
+	first, err := hex.DecodeString(baseFilename[0:32])
+	if err != nil {
+		return []byte{}, err
+	}
+
+	second, err := hex.DecodeString(baseFilename[33:65]) // off-by-one to skip dash in the middle
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return append(first, second...), nil
+}
 
 // Find an approximate set of oldest files.
 //
@@ -95,8 +117,13 @@ func findApproximateOldFiles(basepath string) (int64, fsCacheEntries, error) {
 					// Check if it's the oldest thing we've found in this directory
 					t := fileinfo_atime(entry)
 					if len(old[oldIndex].uuidAndHash) == 0 || t.Before(old[oldIndex].time) {
+						uuidAndHash, err := parseFilename(entry.Name())
+						if err != nil {
+							continue
+						}
+
 						old[oldIndex].ns = ns
-						old[oldIndex].uuidAndHash = entry.Name() // TODO: Chop off extension
+						old[oldIndex].uuidAndHash = uuidAndHash
 						old[oldIndex].size = entry.Size()
 						old[oldIndex].time = t
 					}
