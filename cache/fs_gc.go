@@ -23,9 +23,18 @@ type fsCacheEntry struct {
 type fsCacheEntries []fsCacheEntry
 
 // Implement sort.Interface
-func (f fsCacheEntries) Len() int           { return len(f) }
-func (f fsCacheEntries) Less(i, j int) bool { return f[i].time.Before(f[j].time) }
-func (f fsCacheEntries) Swap(i, j int)      { f[i], f[j] = f[j], f[i] }
+func (f fsCacheEntries) Len() int { return len(f) }
+func (f fsCacheEntries) Less(i, j int) bool {
+	// Fiddle a bit with zero-times, so they always come out last
+	if f[i].time.IsZero() {
+		return false
+	}
+	if f[j].time.IsZero() {
+		return true
+	}
+	return f[i].time.Before(f[j].time)
+}
+func (f fsCacheEntries) Swap(i, j int) { f[i], f[j] = f[j], f[i] }
 
 // Find an approximate set of oldest files.
 //
@@ -106,6 +115,17 @@ func findApproximateOldFiles(basepath string) (int64, fsCacheEntries, error) {
 		totalSize += size
 	}
 
+	// Return only non-empty objecs
 	sort.Sort(old)
-	return totalSize, old, nil
+
+	// TODO: We could do this bookkeeping in the main loop...
+	found_elements := 0
+	for i, elem := range old {
+		if elem.time.IsZero() {
+			found_elements = i
+			break
+		}
+	}
+
+	return totalSize, old[0:found_elements], nil
 }
