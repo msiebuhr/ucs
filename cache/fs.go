@@ -130,9 +130,11 @@ func (fs *FS) collectGarbageOnce() {
 			}
 		}
 
-		// FIXME: This is quite wrong, as we'll only decrement the counter by one of
-		// the elements. (findApproximateOldFiles() really should cough up with
-		// one Size-number for all files sharing an uuidAndHash)
+		// Accounting is approximate, as findApproximateOldFiles() doesn't
+		// guarantee that it finds all kinds of a resource in one go (yet we
+		// delete them in one go).
+		//
+		// Next loop of the GC should fix the overall stats, tho.
 		if successfulDeletes > 0 {
 			size := float64(old[i].size)
 			fs_gc_bytes.Add(size)

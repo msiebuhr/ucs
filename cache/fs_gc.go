@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -116,12 +117,26 @@ func findApproximateOldFiles(basepath string) (int64, fsCacheEntries, error) {
 
 					// Check if it's the oldest thing we've found in this directory
 					t := fileinfo_atime(entry)
-					if len(old[oldIndex].uuidAndHash) == 0 || t.Before(old[oldIndex].time) {
-						uuidAndHash, err := parseFilename(entry.Name())
-						if err != nil {
-							continue
-						}
+					uuidAndHash, err := parseFilename(entry.Name())
+					if err != nil {
+						continue
+					}
 
+					// Same resource, just different kind.
+
+					// FIXME: We're not guaranteed that the items will come in
+					// alphabetical order (which would make this optimization
+					// 100% foolproof), but I think we're pretty close with all
+					// files of the same uuidAndHash having roughly same
+					// timestamp, so we'll ignore all the others...
+					if bytes.Equal(old[oldIndex].uuidAndHash, uuidAndHash) {
+						old[oldIndex].size += entry.Size()
+						if old[oldIndex].time.Before(t) {
+							old[oldIndex].time = t
+						}
+					}
+
+					if len(old[oldIndex].uuidAndHash) == 0 || t.Before(old[oldIndex].time) {
 						old[oldIndex].ns = ns
 						old[oldIndex].uuidAndHash = uuidAndHash
 						old[oldIndex].size = entry.Size()
