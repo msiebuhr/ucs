@@ -3,6 +3,15 @@ Unity Cache Server
 
 .. in Go
 
+> ARCHIVED
+>
+> This was a mostly do-some-work-related-Go. As I no longer work with Unity, I
+> don't really have a need for this, nor can I test it in any meaningful
+> capacity.
+>
+> If you like the project, feel free to fork the project - or petition Unity to
+> take it over.
+
 Installation from source
 ------------------------
 
