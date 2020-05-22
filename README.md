@@ -10,8 +10,8 @@ Installation from source
     ucs
 
 This will listen for cache-requests on TCP port 8126 and start a small
-admin web-server on http://localhost:9126 (currently only servers Promehteus
-metrics on /metrics).
+web-server on http://localhost:9126 with setup-instructinos and Promehteus
+metrics.
 
 Full usage options are shown with `ucs -h`. Note that options can be passed as
 environment variables, making the following examples equivalent:
@@ -23,15 +23,19 @@ environment variables, making the following examples equivalent:
 
 As it is generally recommended to [use a cache per major Unity Release and
 project](https://github.com/Unity-Technologies/unity-cache-server/issues/50#issuecomment-413854421),
-the server supports *namespaces*. This is done by using multiple `-port` arguments or comma-separated list:
+the server supports *namespaces*. This is done by using multiple `-port`
+arguments or comma-separated list.
 
     ucs -port=8126 -port=name:8127
 	ucs -port=8126,name:8127
 	PORT=8126,name:8127 ucs
 
-They will use the same cache, but garbage-collected as one (so old projects'
-data will all but vanish and new ones will get lots of space).
+Each name/port will have a seperate cache, but garbage-collected as one (so old
+projects' data will all but vanish and new ones will get lots of space).
 
+For convenience, ports can be named as in `name:8127`. Is is used for the
+file-system path, display on the help-page and in metrics. If the name is left
+out, the port-number also becomes the name.
 
 Load testing
 ------------
